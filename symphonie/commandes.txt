@@ -1,11 +1,19 @@
-# Commande magique : Le binaire exécute le fichier composer.phar
-# On crée le projet dans le sous-dossier 'app'
-
 ./frankenphp-linux-x86_64 php-cli composer.phar create-project symfony/skeleton app
 ./frankenphp-linux-x86_64 php-cli composer.phar require api -d app/
 ./frankenphp-linux-x86_64 php-cli composer.phar require maker --dev -d app/
+./frankenphp-linux-x86_64 php-cli composer.phar require symfony/mercure-bundle -d app/
 
 
+
+
+
+./frankenphp-linux-x86_64 php-cli app/bin/console doctrine:schema:update --force
+./frankenphp-linux-x86_64 php-cli app/bin/console cache:clear
+
+
+
+
+///////
 
 
 ./frankenphp-linux-x86_64 php-cli composer.phar require symfony/orm-pack -d app/
@@ -27,9 +35,11 @@
 //
 ./frankenphp-linux-x86_64 php-cli composer.phar require maker --dev -d app/
 ./frankenphp-linux-x86_64 php-cli composer.phar require twig -d app/
+
+
+
+
 ./frankenphp-linux-x86_64 php-cli app/bin/console make:controller HomeController
-
-
 
 
 
