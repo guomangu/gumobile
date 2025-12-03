@@ -1,0 +1,7 @@
+./symphonie
+./frankenphp-linux-x86_64 php-server --listen :9080 -r app/public/
+
+
+
+./reactnative
+npx expo start
