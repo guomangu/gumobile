@@ -1,0 +1,79 @@
+# Commande magique : Le binaire exécute le fichier composer.phar
+# On crée le projet dans le sous-dossier 'app'
+
+./frankenphp-linux-x86_64 php-cli composer.phar create-project symfony/skeleton app
+./frankenphp-linux-x86_64 php-cli composer.phar require api -d app/
+./frankenphp-linux-x86_64 php-cli composer.phar require maker --dev -d app/
+
+
+
+
+./frankenphp-linux-x86_64 php-cli composer.phar require symfony/orm-pack -d app/
+
+./frankenphp-linux-x86_64 php-cli composer.phar require symfony/maker-bundle --dev -d app/
+
+
+
+./frankenphp-linux-x86_64 php-cli app/bin/console doctrine:schema:create
+
+
+
+./frankenphp-linux-x86_64 php-server --listen :8080 -r app/public/
+
+
+
+
+
+//
+./frankenphp-linux-x86_64 php-cli composer.phar require maker --dev -d app/
+./frankenphp-linux-x86_64 php-cli composer.phar require twig -d app/
+./frankenphp-linux-x86_64 php-cli app/bin/console make:controller HomeController
+
+
+
+
+
+
+
+//
+./frankenphp-linux-x86_64 php-cli composer.phar require easycorp/easyadmin-bundle -d app/
+./frankenphp-linux-x86_64 php-cli app/bin/console make:admin:dashboard
+./frankenphp-linux-x86_64 php-cli app/bin/console make:admin:crud
+
+//
+./frankenphp-linux-x86_64 php-cli composer.phar require symfony/ux-twig-component symfony/ux-live-component -d app/
+./frankenphp-linux-x86_64 php-cli app/bin/console make:twig-component Alert
+a copier dans les pages
+<twig:Alert type="danger" title="Erreur" message="Le serveur a explosé !" />
+<twig:Alert type="success" title="Bravo" message="Site en ligne." />
+
+//
+./frankenphp-linux-x86_64 php-cli composer.phar require symfonycasts/tailwind-bundle -d app/
+./frankenphp-linux-x86_64 php-cli app/bin/console tailwind:init
+./frankenphp-linux-x86_64 php-cli app/bin/console tailwind:build --watch
+
+
+
+
+
+
+
+
+
+
+(((())))
+
+./frankenphp-linux-x86_64 php-cli app/bin/console cache:clear
+./frankenphp-linux-x86_64 php-cli app/bin/console doctrine:schema:update --force
+
+(((())))
+
+
+
+./frankenphp-linux-x86_64 php-cli app/bin/console make:entity
+
+./frankenphp-linux-x86_64 php-cli app/bin/console cache:clear
+
+./frankenphp-linux-x86_64 php-cli app/bin/console make:controller WikiController
+
+./frankenphp-linux-x86_64 php-cli app/bin/console make:form WikiPageType WikiPage
