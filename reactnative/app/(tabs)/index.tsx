@@ -358,7 +358,8 @@ export default function HomeScreen() {
   // Fonction pour proposer des compétences existantes de la DB basées sur le texte de la demande
   const proposeCompetencesFromDemande = (
     texte: string, 
-    existingCompetences: Competence[] = []
+    existingCompetences: Competence[] = [],
+    demandeGroupeId?: number
   ): CompetenceApi[] => {
     // Liste des mots vides (stop words) en français
     const stopWords = new Set([
@@ -394,6 +395,41 @@ export default function HomeScreen() {
       existingCompetences.map(c => c.nom.toLowerCase().trim())
     );
 
+    // Trouver les compétences liées par groupe
+    // Pour chaque compétence existante dans la demande, trouver les groupes qui la contiennent
+    // puis récupérer toutes les compétences de ces groupes
+    const relatedCompetenceIds = new Set<number>();
+    
+    if (existingCompetences.length > 0) {
+      // Pour chaque compétence existante, trouver dans quels groupes elle apparaît
+      existingCompetences.forEach(existingComp => {
+        groupes.forEach(groupe => {
+          // Ignorer le groupe de la demande actuelle
+          if (groupe.id === demandeGroupeId) return;
+          
+          // Parcourir toutes les demandes du groupe
+          groupe.demandes?.forEach(demande => {
+            // Vérifier si cette demande contient la compétence existante (par nom, insensible à la casse)
+            const hasCompetence = demande.competences?.some(
+              comp => comp.nom.toLowerCase().trim() === existingComp.nom.toLowerCase().trim()
+            );
+            
+            if (hasCompetence) {
+              // Récupérer toutes les compétences de ce groupe
+              groupe.demandes?.forEach(d => {
+                d.competences?.forEach(comp => {
+                  // Ajouter toutes les compétences de ce groupe (sauf celles déjà dans la demande actuelle)
+                  if (!existingCompetenceIds.has(comp.id)) {
+                    relatedCompetenceIds.add(comp.id);
+                  }
+                });
+              });
+            }
+          });
+        });
+      });
+    }
+
     // Filtrer les compétences de la DB qui :
     // 1. Ne sont pas déjà liées à cette demande (par ID)
     // 2. N'ont pas été ajoutées récemment (pour les retirer des propositions)
@@ -413,6 +449,11 @@ export default function HomeScreen() {
     const competencesWithScore = availableCompetences.map(comp => {
       const compNomLower = comp.nom.toLowerCase();
       let score = 0;
+
+      // Bonus si la compétence est dans un groupe lié (groupe qui contient une compétence de la demande)
+      if (relatedCompetenceIds.has(comp.id)) {
+        score += 15; // Bonus important pour les compétences liées par groupe
+      }
 
       // Vérifier si le nom de la compétence contient des mots du texte
       texteWords.forEach(word => {
@@ -466,7 +507,8 @@ export default function HomeScreen() {
               // Proposer des compétences existantes de la DB basées sur le texte de la demande
               const proposedCompetences = proposeCompetencesFromDemande(
                 demande.texte,
-                demande.competences || []
+                demande.competences || [],
+                item.id // Passer l'ID du groupe de la demande
               );
 
               return (
