@@ -24,11 +24,11 @@ class Competence
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['competence:read', 'demande:read'])]
+    #[Groups(['competence:read', 'demande:read', 'groupe:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['competence:read', 'demande:read'])]
+    #[Groups(['competence:read', 'demande:read', 'groupe:read'])]
     private ?string $nom = null;
 
     #[ORM\ManyToOne(targetEntity: Demande::class, inversedBy: 'competences')]

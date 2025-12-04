@@ -39,7 +39,7 @@ class Demande
     private ?Groupe $groupe = null;
 
     #[ORM\OneToMany(targetEntity: Competence::class, mappedBy: 'demande', cascade: ['persist', 'remove'], orphanRemoval: true)]
-    #[Groups(['demande:read'])]
+    #[Groups(['demande:read', 'groupe:read'])]
     private Collection $competences;
 
     public function __construct()
