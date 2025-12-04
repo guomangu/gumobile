@@ -1,0 +1,39 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies - uniquement les node_modules
+node_modules/
+
+# Expo - cache et builds uniquement
+.expo/
+dist/
+web-build/
+
+# Native - fichiers de build et certificats uniquement
+.kotlin/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro - fichiers de santé uniquement
+.metro-health-check*
+
+# debug - fichiers de log de debug uniquement
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# macOS - fichiers système uniquement
+.DS_Store
+
+# local env files - fichiers d'environnement locaux uniquement
+.env.local
+.env*.local
+
+# typescript - fichiers de build uniquement
+*.tsbuildinfo
+
+# Dossiers générés natifs (si présents)
+/ios
+/android
