@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { Platform, StyleSheet, TextInput, Button, Alert, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { useState, useEffect, useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
@@ -84,6 +85,12 @@ export default function HomeScreen() {
   const [userMail, setUserMail] = useState<Record<number, string>>({});
   const [loadingUsers, setLoadingUsers] = useState<Record<number, boolean>>({});
   
+  // États pour l'authentification
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [currentUserPseudo, setCurrentUserPseudo] = useState<string | null>(null);
+  const [loadingAuth, setLoadingAuth] = useState(false);
+  
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const borderColor = useThemeColor({}, 'icon');
@@ -120,7 +127,52 @@ export default function HomeScreen() {
     fetchGroupes();
     fetchAdresses();
     fetchAllCompetences();
+    loadAuthToken();
   }, []);
+
+  // Recharger le token quand l'écran est focus (après connexion)
+  useEffect(() => {
+    const unsubscribe = () => {
+      loadAuthToken();
+    };
+    return unsubscribe;
+  }, []);
+
+  // Charger le token d'authentification au démarrage
+  const loadAuthToken = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const userId = await AsyncStorage.getItem('userId');
+      const userPseudo = await AsyncStorage.getItem('userPseudo');
+      if (token) {
+        setAuthToken(token);
+      }
+      if (userId) {
+        setCurrentUserId(parseInt(userId, 10));
+      }
+      if (userPseudo) {
+        setCurrentUserPseudo(userPseudo);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement du token:', error);
+    }
+  };
+
+  // Fonction de déconnexion
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('authToken');
+      await AsyncStorage.removeItem('userId');
+      await AsyncStorage.removeItem('userPseudo');
+      setAuthToken(null);
+      setCurrentUserId(null);
+      setCurrentUserPseudo(null);
+      Alert.alert('Déconnexion', 'Vous avez été déconnecté avec succès');
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la déconnexion');
+    }
+  };
 
   const fetchAllCompetences = async () => {
     setLoadingAllCompetences(true);
@@ -313,9 +365,14 @@ export default function HomeScreen() {
       const responseData = await response.json();
       
       // Si un token est retourné, l'utilisateur est automatiquement connecté
-      if (responseData.token) {
-        // Stocker le token (vous pouvez utiliser AsyncStorage ou un contexte d'authentification)
-        // Pour l'instant, on affiche juste un message de succès
+      if (responseData.token && responseData.user) {
+        // Stocker le token et l'ID utilisateur
+        await AsyncStorage.setItem('authToken', responseData.token);
+        await AsyncStorage.setItem('userId', responseData.user.id.toString());
+        await AsyncStorage.setItem('userPseudo', responseData.user.pseudo);
+        setAuthToken(responseData.token);
+        setCurrentUserId(responseData.user.id);
+        setCurrentUserPseudo(responseData.user.pseudo);
         Alert.alert('Succès', 'Utilisateur créé et connecté automatiquement !');
       } else {
         Alert.alert('Succès', 'Utilisateur créé et lié au groupe avec succès !');
@@ -345,6 +402,78 @@ export default function HomeScreen() {
       Alert.alert(
         'Erreur',
         error.message || 'Une erreur est survenue lors de la création de l\'utilisateur'
+      );
+    } finally {
+      setLoadingUsers(prev => ({ ...prev, [groupeId]: false }));
+    }
+  };
+
+  const handleJoinGroupe = async (groupeId: number) => {
+    if (!authToken || !currentUserId) {
+      Alert.alert('Erreur', 'Vous devez être connecté pour participer à un groupe');
+      return;
+    }
+
+    setLoadingUsers(prev => ({ ...prev, [groupeId]: true }));
+    try {
+      // Récupérer d'abord l'utilisateur pour obtenir ses groupes actuels
+      const userResponse = await fetch(getApiUrl(`${API_ENDPOINTS.USERS}/${currentUserId}`), {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      if (!userResponse.ok) {
+        throw new Error(`Erreur ${userResponse.status}: ${userResponse.statusText}`);
+      }
+
+      const userData = await userResponse.json();
+      
+      // Vérifier si l'utilisateur est déjà dans le groupe
+      const groupesData = userData.groupesData || userData.groupes || [];
+      const isAlreadyInGroupe = groupesData.some((g: { id: number }) => g.id === groupeId);
+      
+      if (isAlreadyInGroupe) {
+        Alert.alert('Information', 'Vous participez déjà à ce groupe');
+        setLoadingUsers(prev => ({ ...prev, [groupeId]: false }));
+        return;
+      }
+
+      // Ajouter le nouveau groupe à la liste
+      const updatedGroupes = [
+        ...groupesData.map((g: { id: number }) => `/api/groupes/${g.id}`),
+        `/api/groupes/${groupeId}`,
+      ];
+
+      // Mettre à jour l'utilisateur avec le nouveau groupe
+      const updateResponse = await fetch(getApiUrl(`${API_ENDPOINTS.USERS}/${currentUserId}`), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/merge-patch+json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          groupes: updatedGroupes,
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || `Erreur ${updateResponse.status}: ${updateResponse.statusText}`);
+      }
+
+      Alert.alert('Succès', 'Vous participez maintenant à ce groupe !');
+      
+      // Rafraîchir la liste des groupes pour afficher la mise à jour
+      await fetchGroupes();
+    } catch (error: any) {
+      console.error('Erreur lors de la participation au groupe:', error);
+      Alert.alert(
+        'Erreur',
+        error.message || 'Une erreur est survenue lors de la participation au groupe'
       );
     } finally {
       setLoadingUsers(prev => ({ ...prev, [groupeId]: false }));
@@ -587,6 +716,9 @@ export default function HomeScreen() {
     const userPasswordValue = userPassword[item.id] || '';
     const userMailValue = userMail[item.id] || '';
     const isLoadingUser = loadingUsers[item.id] || false;
+    
+    // Vérifier si l'utilisateur connecté est déjà dans le groupe
+    const isCurrentUserInGroupe = currentUserId && users.some(user => user.id === currentUserId);
 
     return (
       <ThemedView style={styles.groupeItem}>
@@ -606,39 +738,62 @@ export default function HomeScreen() {
                 <ThemedText style={styles.userId}>ID: {user.id}</ThemedText>
               </ThemedView>
             ))}
+            {/* Afficher le bouton "Participer" si l'utilisateur est connecté mais pas dans le groupe */}
+            {authToken && currentUserId && !isCurrentUserInGroupe && (
+              <ThemedView style={styles.joinGroupeContainer}>
+                <Button
+                  title={isLoadingUser ? 'Participation...' : 'Participer au groupe'}
+                  onPress={() => handleJoinGroupe(item.id)}
+                  disabled={isLoadingUser}
+                />
+              </ThemedView>
+            )}
           </ThemedView>
         ) : (
           <ThemedView style={styles.createUserContainer}>
-            <ThemedText style={styles.createUserLabel}>Créer un utilisateur pour ce groupe:</ThemedText>
-            <TextInput
-              style={[styles.userInput, { borderColor, color: textColor }]}
-              placeholder="Pseudo..."
-              placeholderTextColor={textColor + '80'}
-              value={userPseudoValue}
-              onChangeText={(text) => setUserPseudo(prev => ({ ...prev, [item.id]: text }))}
-            />
-            <TextInput
-              style={[styles.userInput, { borderColor, color: textColor }]}
-              placeholder="Email..."
-              placeholderTextColor={textColor + '80'}
-              value={userMailValue}
-              onChangeText={(text) => setUserMail(prev => ({ ...prev, [item.id]: text }))}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={[styles.userInput, { borderColor, color: textColor }]}
-              placeholder="Mot de passe..."
-              placeholderTextColor={textColor + '80'}
-              value={userPasswordValue}
-              onChangeText={(text) => setUserPassword(prev => ({ ...prev, [item.id]: text }))}
-              secureTextEntry
-            />
-            <Button
-              title={isLoadingUser ? 'Création...' : 'Créer l\'utilisateur'}
-              onPress={() => handleCreateUser(item.id)}
-              disabled={isLoadingUser || !userPseudoValue.trim() || !userPasswordValue.trim() || !userMailValue.trim()}
-            />
+            {authToken && currentUserId ? (
+              <>
+                <ThemedText style={styles.createUserLabel}>Vous êtes connecté</ThemedText>
+                <Button
+                  title={isLoadingUser ? 'Participation...' : 'Participer au groupe'}
+                  onPress={() => handleJoinGroupe(item.id)}
+                  disabled={isLoadingUser}
+                />
+              </>
+            ) : (
+              <>
+                <ThemedText style={styles.createUserLabel}>Créer un utilisateur pour ce groupe:</ThemedText>
+                <TextInput
+                  style={[styles.userInput, { borderColor, color: textColor }]}
+                  placeholder="Pseudo..."
+                  placeholderTextColor={textColor + '80'}
+                  value={userPseudoValue}
+                  onChangeText={(text) => setUserPseudo(prev => ({ ...prev, [item.id]: text }))}
+                />
+                <TextInput
+                  style={[styles.userInput, { borderColor, color: textColor }]}
+                  placeholder="Email..."
+                  placeholderTextColor={textColor + '80'}
+                  value={userMailValue}
+                  onChangeText={(text) => setUserMail(prev => ({ ...prev, [item.id]: text }))}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+                <TextInput
+                  style={[styles.userInput, { borderColor, color: textColor }]}
+                  placeholder="Mot de passe..."
+                  placeholderTextColor={textColor + '80'}
+                  value={userPasswordValue}
+                  onChangeText={(text) => setUserPassword(prev => ({ ...prev, [item.id]: text }))}
+                  secureTextEntry
+                />
+                <Button
+                  title={isLoadingUser ? 'Création...' : 'Créer l\'utilisateur'}
+                  onPress={() => handleCreateUser(item.id)}
+                  disabled={isLoadingUser || !userPseudoValue.trim() || !userPasswordValue.trim() || !userMailValue.trim()}
+                />
+              </>
+            )}
           </ThemedView>
         )}
         {hasDemande ? (
@@ -809,8 +964,24 @@ export default function HomeScreen() {
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
+        <ThemedView style={styles.headerRow}>
+          <ThemedView style={styles.titleSection}>
+            <ThemedText type="title">Welcome!</ThemedText>
+            <HelloWave />
+          </ThemedView>
+          {authToken && currentUserPseudo && (
+            <ThemedView style={styles.authSection}>
+              <ThemedText style={styles.userInfo}>
+                Connecté: {currentUserPseudo}
+              </ThemedText>
+              <Button
+                title="Déconnexion"
+                onPress={handleLogout}
+                color="#ff3b30"
+              />
+            </ThemedView>
+          )}
+        </ThemedView>
       </ThemedView>
       
       
@@ -865,9 +1036,29 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   titleContainer: {
+    gap: 8,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  titleSection: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
+  },
+  authSection: {
+    gap: 8,
+    alignItems: 'flex-end',
+  },
+  userInfo: {
+    fontSize: 12,
+    opacity: 0.7,
+    fontStyle: 'italic',
   },
   stepContainer: {
     gap: 8,
@@ -1174,6 +1365,12 @@ const styles = StyleSheet.create({
     padding: 10,
     fontSize: 14,
     minHeight: 40,
+  },
+  joinGroupeContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
   },
   reactLogo: {
     height: 178,

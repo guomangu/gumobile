@@ -15,12 +15,13 @@ security:
         login:
             pattern: ^/api/login
             stateless: true
-            json_login:
-                check_path: /api/login
-                username_path: pseudo
-                password_path: password
-                success_handler: lexik_jwt_authentication.handler.authentication_success
-                failure_handler: lexik_jwt_authentication.handler.authentication_failure
+            # Désactivé pour utiliser le contrôleur personnalisé AuthController
+            # json_login:
+            #     check_path: /api/login
+            #     username_path: pseudo
+            #     password_path: password
+            #     success_handler: lexik_jwt_authentication.handler.authentication_success
+            #     failure_handler: lexik_jwt_authentication.handler.authentication_failure
         api:
             pattern: ^/api
             stateless: true

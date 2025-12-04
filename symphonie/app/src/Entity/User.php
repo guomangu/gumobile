@@ -5,6 +5,7 @@ namespace App\Entity;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\UserRepository;
 use App\StateProcessor\UserPasswordHasher;
@@ -23,6 +24,9 @@ use Symfony\Component\Serializer\Annotation\Groups;
         new Post(
             denormalizationContext: ['groups' => ['user:write']],
             processor: UserPasswordHasher::class
+        ),
+        new Patch(
+            denormalizationContext: ['groups' => ['user:write']]
         ),
     ],
     formats: ['json' => ['application/json']]
