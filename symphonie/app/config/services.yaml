@@ -16,5 +16,10 @@ services:
     App\:
         resource: '../src/'
 
+    # Configuration spécifique pour UserPasswordHasher
+    App\StateProcessor\UserPasswordHasher:
+        arguments:
+            $processor: '@api_platform.doctrine.orm.state.persist_processor'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

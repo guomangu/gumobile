@@ -41,6 +41,7 @@ export const API_ENDPOINTS = {
   ADRESSES: 'adresses',
   DEMANDES: 'demandes',
   COMPETENCES: 'competences',
+  USERS: 'users',
 } as const;
 
 

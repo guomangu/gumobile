@@ -30,10 +30,22 @@ interface Demande {
   competences?: Competence[];
 }
 
+interface User {
+  id: number;
+  pseudo: string;
+  mail: string;
+  groupes?: {
+    id: number;
+    nom: string;
+  }[];
+}
+
 interface Groupe {
   id: number;
   nom: string;
   demandes?: Demande[];
+  users?: User[];
+  usersData?: User[];
 }
 
 export default function HomeScreen() {
@@ -65,6 +77,12 @@ export default function HomeScreen() {
   
   // État pour suivre les compétences ajoutées récemment (pour les retirer des propositions)
   const [addedCompetenceIds, setAddedCompetenceIds] = useState<Set<number>>(new Set());
+  
+  // États pour la création d'utilisateur
+  const [userPseudo, setUserPseudo] = useState<Record<number, string>>({});
+  const [userPassword, setUserPassword] = useState<Record<number, string>>({});
+  const [userMail, setUserMail] = useState<Record<number, string>>({});
+  const [loadingUsers, setLoadingUsers] = useState<Record<number, boolean>>({});
   
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -257,6 +275,79 @@ export default function HomeScreen() {
       );
     } finally {
       setLoadingDemandes(prev => ({ ...prev, [groupeId]: false }));
+    }
+  };
+
+  const handleCreateUser = async (groupeId: number) => {
+    const pseudo = userPseudo[groupeId]?.trim();
+    const password = userPassword[groupeId]?.trim();
+    const mail = userMail[groupeId]?.trim();
+
+    if (!pseudo || !password || !mail) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      return;
+    }
+
+    setLoadingUsers(prev => ({ ...prev, [groupeId]: true }));
+    try {
+      // Créer l'utilisateur
+      const response = await fetch(getApiUrl(API_ENDPOINTS.USERS), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          pseudo: pseudo,
+          password: password,
+          mail: mail,
+          groupes: [`/api/groupes/${groupeId}`],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Erreur ${response.status}: ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+      
+      // Si un token est retourné, l'utilisateur est automatiquement connecté
+      if (responseData.token) {
+        // Stocker le token (vous pouvez utiliser AsyncStorage ou un contexte d'authentification)
+        // Pour l'instant, on affiche juste un message de succès
+        Alert.alert('Succès', 'Utilisateur créé et connecté automatiquement !');
+      } else {
+        Alert.alert('Succès', 'Utilisateur créé et lié au groupe avec succès !');
+      }
+      
+      // Réinitialiser les champs pour ce groupe
+      setUserPseudo(prev => {
+        const newState = { ...prev };
+        delete newState[groupeId];
+        return newState;
+      });
+      setUserPassword(prev => {
+        const newState = { ...prev };
+        delete newState[groupeId];
+        return newState;
+      });
+      setUserMail(prev => {
+        const newState = { ...prev };
+        delete newState[groupeId];
+        return newState;
+      });
+      
+      // Rafraîchir la liste des groupes pour afficher le nouvel utilisateur
+      await fetchGroupes();
+    } catch (error: any) {
+      console.error('Erreur lors de la création de l\'utilisateur:', error);
+      Alert.alert(
+        'Erreur',
+        error.message || 'Une erreur est survenue lors de la création de l\'utilisateur'
+      );
+    } finally {
+      setLoadingUsers(prev => ({ ...prev, [groupeId]: false }));
     }
   };
 
@@ -490,6 +581,12 @@ export default function HomeScreen() {
     const hasDemande = item.demandes && item.demandes.length > 0;
     const demandeTexte = demandeTextes[item.id] || '';
     const isLoading = loadingDemandes[item.id] || false;
+    const users = item.usersData || item.users || [];
+    const hasUsers = users.length > 0;
+    const userPseudoValue = userPseudo[item.id] || '';
+    const userPasswordValue = userPassword[item.id] || '';
+    const userMailValue = userMail[item.id] || '';
+    const isLoadingUser = loadingUsers[item.id] || false;
 
     return (
       <ThemedView style={styles.groupeItem}>
@@ -497,6 +594,53 @@ export default function HomeScreen() {
           <ThemedText type="defaultSemiBold">{item.nom}</ThemedText>
           <ThemedText style={styles.groupeId}>ID: {item.id}</ThemedText>
         </ThemedView>
+        
+        {/* Section Utilisateurs */}
+        {hasUsers ? (
+          <ThemedView style={styles.usersContainer}>
+            <ThemedText style={styles.usersLabel}>Utilisateurs du groupe:</ThemedText>
+            {users.map((user) => (
+              <ThemedView key={user.id} style={styles.userItem}>
+                <ThemedText style={styles.userPseudo}>{user.pseudo}</ThemedText>
+                <ThemedText style={styles.userMail}>{user.mail}</ThemedText>
+                <ThemedText style={styles.userId}>ID: {user.id}</ThemedText>
+              </ThemedView>
+            ))}
+          </ThemedView>
+        ) : (
+          <ThemedView style={styles.createUserContainer}>
+            <ThemedText style={styles.createUserLabel}>Créer un utilisateur pour ce groupe:</ThemedText>
+            <TextInput
+              style={[styles.userInput, { borderColor, color: textColor }]}
+              placeholder="Pseudo..."
+              placeholderTextColor={textColor + '80'}
+              value={userPseudoValue}
+              onChangeText={(text) => setUserPseudo(prev => ({ ...prev, [item.id]: text }))}
+            />
+            <TextInput
+              style={[styles.userInput, { borderColor, color: textColor }]}
+              placeholder="Email..."
+              placeholderTextColor={textColor + '80'}
+              value={userMailValue}
+              onChangeText={(text) => setUserMail(prev => ({ ...prev, [item.id]: text }))}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={[styles.userInput, { borderColor, color: textColor }]}
+              placeholder="Mot de passe..."
+              placeholderTextColor={textColor + '80'}
+              value={userPasswordValue}
+              onChangeText={(text) => setUserPassword(prev => ({ ...prev, [item.id]: text }))}
+              secureTextEntry
+            />
+            <Button
+              title={isLoadingUser ? 'Création...' : 'Créer l\'utilisateur'}
+              onPress={() => handleCreateUser(item.id)}
+              disabled={isLoadingUser || !userPseudoValue.trim() || !userPasswordValue.trim() || !userMailValue.trim()}
+            />
+          </ThemedView>
+        )}
         {hasDemande ? (
           <ThemedView style={styles.demandeContainer}>
             <ThemedText style={styles.demandeLabel}>Demande existante:</ThemedText>
@@ -981,6 +1125,55 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     fontStyle: 'italic',
     marginTop: 4,
+  },
+  usersContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+    gap: 8,
+  },
+  usersLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.7,
+  },
+  userItem: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+    gap: 4,
+  },
+  userPseudo: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  userMail: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  userId: {
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  createUserContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+    gap: 8,
+  },
+  createUserLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.7,
+  },
+  userInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 14,
+    minHeight: 40,
   },
   reactLogo: {
     height: 178,

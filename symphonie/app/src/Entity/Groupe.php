@@ -41,10 +41,14 @@ class Groupe
     #[Groups(['groupe:read'])]
     private Collection $demandes;
 
+    #[ORM\ManyToMany(targetEntity: User::class, mappedBy: 'groupes')]
+    private Collection $users;
+
     public function __construct()
     {
         $this->adresses = new ArrayCollection();
         $this->demandes = new ArrayCollection();
+        $this->users = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -117,6 +121,50 @@ class Groupe
             if ($demande->getGroupe() === $this) {
                 $demande->setGroupe(null);
             }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    public function getUsers(): Collection
+    {
+        return $this->users;
+    }
+
+    /**
+     * Méthode pour obtenir les utilisateurs sans référence circulaire (pour la sérialisation)
+     * @return array<int, array{id: int, pseudo: string, mail: string}>
+     */
+    #[Groups(['groupe:read'])]
+    public function getUsersData(): array
+    {
+        return $this->users->map(function ($user) {
+            return [
+                'id' => $user->getId(),
+                'pseudo' => $user->getPseudo(),
+                'mail' => $user->getMail(),
+            ];
+        })->toArray();
+    }
+
+    public function addUser(User $user): static
+    {
+        if (!$this->users->contains($user)) {
+            $this->users->add($user);
+            // Ne pas appeler addGroupe pour éviter la référence circulaire
+            // La relation sera gérée par Doctrine
+        }
+
+        return $this;
+    }
+
+    public function removeUser(User $user): static
+    {
+        if ($this->users->removeElement($user)) {
+            $user->removeGroupe($this);
         }
 
         return $this;
