@@ -29,9 +29,14 @@ class Groupe
     #[Groups(['groupe:read'])]
     private Collection $adresses;
 
+    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'groupe', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[Groups(['groupe:read'])]
+    private Collection $demandes;
+
     public function __construct()
     {
         $this->adresses = new ArrayCollection();
+        $this->demandes = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -74,6 +79,35 @@ class Groupe
         if ($this->adresses->removeElement($adresse)) {
             if ($adresse->getGroupe() === $this) {
                 $adresse->setGroupe(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Demande>
+     */
+    public function getDemandes(): Collection
+    {
+        return $this->demandes;
+    }
+
+    public function addDemande(Demande $demande): static
+    {
+        if (!$this->demandes->contains($demande)) {
+            $this->demandes->add($demande);
+            $demande->setGroupe($this);
+        }
+
+        return $this;
+    }
+
+    public function removeDemande(Demande $demande): static
+    {
+        if ($this->demandes->removeElement($demande)) {
+            if ($demande->getGroupe() === $this) {
+                $demande->setGroupe(null);
             }
         }
 
