@@ -6,7 +6,10 @@ use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
+use App\Enum\TypeTagAdresse;
 use App\Repository\AdresseRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 
@@ -24,42 +27,69 @@ class Adresse
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['adresse:read'])]
+    #[Groups(['adresse:read', 'groupe:read'])]
     private ?int $id = null;
 
-    #[ORM\Column(length: 500)]
-    #[Groups(['adresse:read'])]
-    private ?string $adresseComplete = null;
+    #[ORM\Column(enumType: TypeTagAdresse::class)]
+    #[Groups(['adresse:read', 'groupe:read'])]
+    private ?TypeTagAdresse $type = null;
+
+    #[ORM\Column(length: 255)]
+    #[Groups(['adresse:read', 'groupe:read'])]
+    private ?string $valeur = null;
 
     #[ORM\Column(nullable: true)]
-    #[Groups(['adresse:read'])]
+    #[Groups(['adresse:read', 'groupe:read'])]
     private ?float $latitude = null;
 
     #[ORM\Column(nullable: true)]
-    #[Groups(['adresse:read'])]
+    #[Groups(['adresse:read', 'groupe:read'])]
     private ?float $longitude = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\ManyToOne(targetEntity: Adresse::class, inversedBy: 'enfants')]
+    #[ORM\JoinColumn(nullable: true)]
     #[Groups(['adresse:read'])]
-    private ?string $complement = null;
+    private ?Adresse $parent = null;
 
-    #[ORM\OneToOne(targetEntity: Groupe::class, mappedBy: 'adresse', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(targetEntity: Adresse::class, mappedBy: 'parent', cascade: ['persist', 'remove'])]
+    #[Groups(['adresse:read'])]
+    private Collection $enfants;
+
+    #[ORM\ManyToOne(targetEntity: Groupe::class, inversedBy: 'adresses')]
+    #[ORM\JoinColumn(nullable: false)]
     #[Groups(['adresse:read'])]
     private ?Groupe $groupe = null;
+
+    public function __construct()
+    {
+        $this->enfants = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
         return $this->id;
     }
 
-    public function getAdresseComplete(): ?string
+    public function getType(): ?TypeTagAdresse
     {
-        return $this->adresseComplete;
+        return $this->type;
     }
 
-    public function setAdresseComplete(string $adresseComplete): static
+    public function setType(TypeTagAdresse $type): static
     {
-        $this->adresseComplete = $adresseComplete;
+        $this->type = $type;
+
+        return $this;
+    }
+
+    public function getValeur(): ?string
+    {
+        return $this->valeur;
+    }
+
+    public function setValeur(string $valeur): static
+    {
+        $this->valeur = $valeur;
 
         return $this;
     }
@@ -88,14 +118,43 @@ class Adresse
         return $this;
     }
 
-    public function getComplement(): ?string
+    public function getParent(): ?self
     {
-        return $this->complement;
+        return $this->parent;
     }
 
-    public function setComplement(?string $complement): static
+    public function setParent(?self $parent): static
     {
-        $this->complement = $complement;
+        $this->parent = $parent;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, self>
+     */
+    public function getEnfants(): Collection
+    {
+        return $this->enfants;
+    }
+
+    public function addEnfant(self $enfant): static
+    {
+        if (!$this->enfants->contains($enfant)) {
+            $this->enfants->add($enfant);
+            $enfant->setParent($this);
+        }
+
+        return $this;
+    }
+
+    public function removeEnfant(self $enfant): static
+    {
+        if ($this->enfants->removeElement($enfant)) {
+            if ($enfant->getParent() === $this) {
+                $enfant->setParent(null);
+            }
+        }
 
         return $this;
     }
@@ -105,11 +164,10 @@ class Adresse
         return $this->groupe;
     }
 
-    public function setGroupe(Groupe $groupe): static
+    public function setGroupe(?Groupe $groupe): static
     {
         $this->groupe = $groupe;
 
         return $this;
     }
 }
-

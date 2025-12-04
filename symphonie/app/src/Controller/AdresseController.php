@@ -4,6 +4,8 @@ namespace App\Controller;
 
 use App\Entity\Adresse;
 use App\Entity\Groupe;
+use App\Enum\TypeTagAdresse;
+use App\Repository\AdresseRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -19,7 +21,8 @@ class AdresseController extends AbstractController
 
     public function __construct(
         private EntityManagerInterface $entityManager,
-        private HttpClientInterface $httpClient
+        private HttpClientInterface $httpClient,
+        private AdresseRepository $adresseRepository
     ) {
     }
 
@@ -60,34 +63,107 @@ class AdresseController extends AbstractController
             $properties = $feature['properties'];
             $coordinates = $feature['geometry']['coordinates'];
 
-            // Création de l'adresse
-            $adresse = new Adresse();
-            $adresse->setAdresseComplete($properties['label'] ?? $query);
-            $adresse->setLatitude($coordinates[1] ?? null);
-            $adresse->setLongitude($coordinates[0] ?? null);
-            $adresse->setComplement($complement);
-
-            // Création automatique d'un groupe enfant
+            // Création automatique d'un groupe
             $groupe = new Groupe();
             $groupe->setNom('Groupe de ' . ($properties['label'] ?? $query));
-            $groupe->setAdresse($adresse);
-            $adresse->setGroupe($groupe);
-
-            $this->entityManager->persist($adresse);
             $this->entityManager->persist($groupe);
+
+            // Extraction des composants de l'adresse
+            $pays = $properties['context'] ?? 'France';
+            $region = $this->extractRegion($properties);
+            $ville = $properties['city'] ?? '';
+            $rue = $properties['street'] ?? '';
+            $numRue = $properties['housenumber'] ?? '';
+
+            // Création de la hiérarchie de tags
+            $tags = [];
+            $parent = null;
+
+            // Pays
+            if (!empty($pays)) {
+                $tagPays = $this->findOrCreateTag(
+                    TypeTagAdresse::PAYS,
+                    $pays,
+                    null,
+                    null,
+                    null,
+                    $groupe
+                );
+                $tags[] = $tagPays;
+                $parent = $tagPays;
+            }
+
+            // Région
+            if (!empty($region) && $parent) {
+                $tagRegion = $this->findOrCreateTag(
+                    TypeTagAdresse::REGION,
+                    $region,
+                    $parent,
+                    null,
+                    null,
+                    $groupe
+                );
+                $tags[] = $tagRegion;
+                $parent = $tagRegion;
+            }
+
+            // Ville
+            if (!empty($ville) && $parent) {
+                $tagVille = $this->findOrCreateTag(
+                    TypeTagAdresse::VILLE,
+                    $ville,
+                    $parent,
+                    $coordinates[1] ?? null,
+                    $coordinates[0] ?? null,
+                    $groupe
+                );
+                $tags[] = $tagVille;
+                $parent = $tagVille;
+            }
+
+            // Rue
+            if (!empty($rue) && $parent) {
+                $tagRue = $this->findOrCreateTag(
+                    TypeTagAdresse::RUE,
+                    $rue,
+                    $parent,
+                    $coordinates[1] ?? null,
+                    $coordinates[0] ?? null,
+                    $groupe
+                );
+                $tags[] = $tagRue;
+                $parent = $tagRue;
+            }
+
+            // Numéro de rue
+            if (!empty($numRue) && $parent) {
+                $tagNumRue = $this->findOrCreateTag(
+                    TypeTagAdresse::NUMRUE,
+                    $numRue,
+                    $parent,
+                    $coordinates[1] ?? null,
+                    $coordinates[0] ?? null,
+                    $groupe
+                );
+                $tags[] = $tagNumRue;
+            }
+
             $this->entityManager->flush();
 
-            // Retourner l'adresse avec le groupe
+            // Retourner le groupe avec tous ses tags
             return new JsonResponse([
-                'id' => $adresse->getId(),
-                'adresse_complete' => $adresse->getAdresseComplete(),
-                'latitude' => $adresse->getLatitude(),
-                'longitude' => $adresse->getLongitude(),
-                'complement' => $adresse->getComplement(),
-                'groupe' => [
-                    'id' => $groupe->getId(),
-                    'nom' => $groupe->getNom(),
-                ],
+                'id' => $groupe->getId(),
+                'nom' => $groupe->getNom(),
+                'adresses' => array_map(function (Adresse $tag) {
+                    return [
+                        'id' => $tag->getId(),
+                        'type' => $tag->getType()?->value,
+                        'valeur' => $tag->getValeur(),
+                        'latitude' => $tag->getLatitude(),
+                        'longitude' => $tag->getLongitude(),
+                        'parent_id' => $tag->getParent()?->getId(),
+                    ];
+                }, $tags),
             ], Response::HTTP_CREATED);
 
         } catch (\Exception $e) {
@@ -97,5 +173,64 @@ class AdresseController extends AbstractController
             );
         }
     }
-}
 
+    /**
+     * Recherche un tag existant ou en crée un nouveau
+     */
+    private function findOrCreateTag(
+        TypeTagAdresse $type,
+        string $valeur,
+        ?Adresse $parent,
+        ?float $latitude,
+        ?float $longitude,
+        Groupe $groupe
+    ): Adresse {
+        // Si le parent existe mais n'a pas d'ID, on doit d'abord le flush
+        if ($parent && $parent->getId() === null) {
+            $this->entityManager->flush();
+        }
+
+        // Recherche d'un tag existant avec le même type, valeur et parent
+        $existingTag = $this->adresseRepository->findExistingTag($type, $valeur, $parent);
+
+        if ($existingTag) {
+            // Si le tag existe, on l'ajoute au groupe (s'il n'y est pas déjà)
+            if ($existingTag->getGroupe() !== $groupe) {
+                $groupe->addAdresse($existingTag);
+            }
+            return $existingTag;
+        }
+
+        // Création d'un nouveau tag
+        $tag = new Adresse();
+        $tag->setType($type);
+        $tag->setValeur($valeur);
+        $tag->setParent($parent);
+        $tag->setLatitude($latitude);
+        $tag->setLongitude($longitude);
+        $tag->setGroupe($groupe);
+
+        $this->entityManager->persist($tag);
+        // Flush immédiatement pour que le tag ait un ID pour les recherches suivantes
+        $this->entityManager->flush();
+
+        return $tag;
+    }
+
+    /**
+     * Extrait la région depuis les propriétés de l'API BAN
+     */
+    private function extractRegion(array $properties): string
+    {
+        // L'API BAN peut retourner la région dans différents champs
+        if (isset($properties['context'])) {
+            $context = $properties['context'];
+            // Le contexte est généralement au format "XX, Région, Pays"
+            $parts = explode(',', $context);
+            if (count($parts) >= 2) {
+                return trim($parts[1]);
+            }
+        }
+        return '';
+    }
+}
