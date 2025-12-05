@@ -1,39 +1,147 @@
 import { Image } from 'expo-image';
 import { StyleSheet, Button, Alert } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter, useFocusEffect } from 'expo-router';
 
 import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { CreateAddressForm } from '@/components/CreateAddressForm';
-import { GroupeItem } from '@/components/GroupeItem';
-import { getCompetences, getApiUrl, API_ENDPOINTS, type Competence as CompetenceApi } from '@/constants/api';
+import { getApiUrl, API_ENDPOINTS, getCompetences, type Competence as CompetenceApi } from '@/constants/api';
 import { type Groupe } from '@/components/types';
+import { GroupeItem } from '@/components/GroupeItem';
 
 export default function HomeScreen() {
+  const router = useRouter();
+  
   // États pour l'authentification
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [currentUserPseudo, setCurrentUserPseudo] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   
-  // État pour le groupe créé
-  const [createdGroupe, setCreatedGroupe] = useState<Groupe | null>(null);
-  
-  // État pour tous les groupes (nécessaire pour les propositions de compétences)
-  const [allGroupes, setAllGroupes] = useState<Groupe[]>([]);
-  
-  // États pour GroupeItem
+  // États pour le groupe créé
+  const [groupeCree, setGroupeCree] = useState<Groupe | null>(null);
   const [allCompetences, setAllCompetences] = useState<CompetenceApi[]>([]);
   const [addedCompetenceIds, setAddedCompetenceIds] = useState<Set<number>>(new Set());
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+
+  // Définir fetchGroupeComplet avant les autres fonctions qui l'utilisent
+  const fetchGroupeComplet = useCallback(async (groupeId: number): Promise<Groupe | null> => {
+    try {
+      console.log('[fetchGroupeComplet] Chargement du groupe ID:', groupeId);
+      const url = getApiUrl(`${API_ENDPOINTS.GROUPES}/${groupeId}`);
+      console.log('[fetchGroupeComplet] URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      console.log('[fetchGroupeComplet] Status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.error('[fetchGroupeComplet] Erreur réponse:', response.status, errorText);
+        
+        // Si c'est une erreur 500, essayer de récupérer le groupe depuis la liste
+        if (response.status === 500) {
+          console.warn('[fetchGroupeComplet] Erreur 500, tentative de récupération depuis la liste des groupes');
+          try {
+            const listResponse = await fetch(getApiUrl(API_ENDPOINTS.GROUPES), {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/json',
+              },
+            });
+            if (listResponse.ok) {
+              const listData = await listResponse.json();
+              const groupesList = listData['hydra:member'] || listData || [];
+              const groupe = Array.isArray(groupesList) 
+                ? groupesList.find((g: Groupe) => g.id === groupeId)
+                : null;
+              if (groupe) {
+                console.log('[fetchGroupeComplet] Groupe trouvé dans la liste:', groupe);
+                // S'assurer que le groupe a la bonne structure
+                return {
+                  id: groupe.id,
+                  nom: groupe.nom,
+                  demandes: groupe.demandes || [],
+                  users: groupe.usersData || groupe.users || [],
+                  usersData: groupe.usersData || groupe.users || [],
+                };
+              } else {
+                console.warn('[fetchGroupeComplet] Groupe non trouvé dans la liste, ID recherché:', groupeId);
+              }
+            }
+          } catch (listError) {
+            console.error('[fetchGroupeComplet] Erreur lors de la récupération depuis la liste:', listError);
+          }
+        }
+        
+        throw new Error(`Erreur ${response.status}: ${response.statusText}\n${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('[fetchGroupeComplet] Données reçues:', data);
+      return {
+        id: data.id,
+        nom: data.nom,
+        demandes: data.demandes || [],
+        users: data.usersData || data.users || [],
+        usersData: data.usersData || data.users || [],
+      };
+    } catch (error: any) {
+      console.error('[fetchGroupeComplet] Erreur complète:', error);
+      console.error('[fetchGroupeComplet] Message:', error.message);
+      return null;
+    }
+  }, []);
+
+  const saveGroupeCree = useCallback(async (groupeId: number) => {
+    try {
+      console.log('[saveGroupeCree] Sauvegarde du groupe ID:', groupeId);
+      await AsyncStorage.setItem('groupeCreeId', groupeId.toString());
+      console.log('[saveGroupeCree] Groupe sauvegardé avec succès');
+    } catch (error) {
+      console.error('[saveGroupeCree] Erreur:', error);
+    }
+  }, []);
+
+  const loadGroupeCree = useCallback(async () => {
+    try {
+      console.log('[loadGroupeCree] Chargement du groupe depuis AsyncStorage');
+      const groupeIdStr = await AsyncStorage.getItem('groupeCreeId');
+      console.log('[loadGroupeCree] ID trouvé:', groupeIdStr);
+      if (groupeIdStr) {
+        const groupeId = parseInt(groupeIdStr, 10);
+        if (!isNaN(groupeId)) {
+          const groupe = await fetchGroupeComplet(groupeId);
+          if (groupe) {
+            console.log('[loadGroupeCree] Groupe chargé:', groupe);
+            setGroupeCree(groupe);
+          } else {
+            console.warn('[loadGroupeCree] Impossible de charger le groupe complet');
+          }
+        } else {
+          console.error('[loadGroupeCree] ID invalide:', groupeIdStr);
+        }
+      } else {
+        console.log('[loadGroupeCree] Aucun groupe sauvegardé');
+      }
+    } catch (error) {
+      console.error('[loadGroupeCree] Erreur:', error);
+    }
+  }, [fetchGroupeComplet]);
 
   useEffect(() => {
     loadAuthToken();
+    loadUserId();
     fetchAllCompetences();
-    fetchAllGroupes();
-    loadSavedGroupe();
-  }, []);
+    loadGroupeCree();
+  }, [loadGroupeCree]);
 
   useEffect(() => {
     const unsubscribe = () => {
@@ -42,22 +150,36 @@ export default function HomeScreen() {
     return unsubscribe;
   }, []);
 
+  // Rafraîchir le groupe quand on revient sur la page
+  useFocusEffect(
+    useCallback(() => {
+      loadGroupeCree();
+    }, [loadGroupeCree])
+  );
+
   const loadAuthToken = async () => {
     try {
       const token = await AsyncStorage.getItem('authToken');
-      const userId = await AsyncStorage.getItem('userId');
       const userPseudo = await AsyncStorage.getItem('userPseudo');
       if (token) {
         setAuthToken(token);
-      }
-      if (userId) {
-        setCurrentUserId(parseInt(userId, 10));
       }
       if (userPseudo) {
         setCurrentUserPseudo(userPseudo);
       }
     } catch (error) {
       console.error('Erreur lors du chargement du token:', error);
+    }
+  };
+
+  const loadUserId = async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (userId) {
+        setCurrentUserId(parseInt(userId, 10));
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement de l\'ID utilisateur:', error);
     }
   };
 
@@ -71,45 +193,16 @@ export default function HomeScreen() {
     }
   };
 
-  const fetchAllGroupes = async () => {
-    try {
-      const response = await fetch(getApiUrl(API_ENDPOINTS.GROUPES), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
 
-      if (!response.ok) {
-        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const groupesList = data['hydra:member'] || data || [];
-      setAllGroupes(Array.isArray(groupesList) ? groupesList : []);
-    } catch (error: any) {
-      console.error('Erreur lors de la récupération des groupes:', error);
-      setAllGroupes([]);
-    }
-  };
-
-  const handleUpdate = async () => {
-    // Recharger le groupe depuis l'API pour mettre à jour les données (demandes, users, etc.)
-    if (createdGroupe) {
-      const updatedGroupe = await fetchGroupeById(createdGroupe.id);
-      if (updatedGroupe) {
-        setCreatedGroupe(updatedGroupe);
-        // S'assurer que l'ID reste sauvegardé après la mise à jour
-        await saveGroupeId(updatedGroupe.id);
+  const handleUpdateGroupe = useCallback(async () => {
+    if (groupeCree) {
+      const groupe = await fetchGroupeComplet(groupeCree.id);
+      if (groupe) {
+        setGroupeCree(groupe);
       }
     }
-    // Recharger aussi tous les groupes pour avoir les données complètes pour les propositions
-    await fetchAllGroupes();
-  };
-
-  const handleAllCompetencesUpdate = () => {
     fetchAllCompetences();
-  };
+  }, [groupeCree, fetchGroupeComplet]);
 
   const handleLogout = async () => {
     try {
@@ -125,82 +218,28 @@ export default function HomeScreen() {
     }
   };
 
-  const fetchGroupeById = async (groupeId: number): Promise<Groupe | null> => {
-    try {
-      const response = await fetch(getApiUrl(`${API_ENDPOINTS.GROUPES}/${groupeId}`), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return {
-        id: data.id,
-        nom: data.nom,
-        demandes: data.demandes || [],
-        users: data.users || [],
-        usersData: data.usersData || data.users || [],
-      };
-    } catch (error: any) {
-      console.error('Erreur lors de la récupération du groupe:', error);
-      return null;
-    }
-  };
-
-  const loadSavedGroupe = async () => {
-    try {
-      const savedGroupeId = await AsyncStorage.getItem('createdGroupeId');
-      if (savedGroupeId) {
-        const groupeId = parseInt(savedGroupeId, 10);
-        const groupe = await fetchGroupeById(groupeId);
-        if (groupe) {
-          setCreatedGroupe(groupe);
-        } else {
-          // Si le groupe n'existe plus, supprimer l'ID sauvegardé
-          await AsyncStorage.removeItem('createdGroupeId');
-        }
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement du groupe sauvegardé:', error);
-    }
-  };
-
-  const saveGroupeId = async (groupeId: number) => {
-    try {
-      await AsyncStorage.setItem('createdGroupeId', groupeId.toString());
-    } catch (error) {
-      console.error('Erreur lors de la sauvegarde du groupe:', error);
-    }
-  };
-
-  const clearSavedGroupeId = async () => {
-    try {
-      await AsyncStorage.removeItem('createdGroupeId');
-    } catch (error) {
-      console.error('Erreur lors de la suppression du groupe sauvegardé:', error);
-    }
-  };
-
-  const handleAddressCreated = async (groupe?: Groupe) => {
+  const handleAddressCreated = useCallback(async (groupe?: Groupe) => {
+    // Afficher le groupe créé sur la page home
     if (groupe) {
-      // Récupérer le groupe complet depuis l'API pour avoir toutes les données
-      const fullGroupe = await fetchGroupeById(groupe.id);
-      if (fullGroupe) {
-        setCreatedGroupe(fullGroupe);
-        // Sauvegarder l'ID du groupe dans AsyncStorage
-        await saveGroupeId(fullGroupe.id);
+      console.log('[handleAddressCreated] Groupe reçu:', groupe);
+      // Sauvegarder l'ID du groupe
+      await saveGroupeCree(groupe.id);
+      // Charger le groupe complet depuis l'API
+      const groupeComplet = await fetchGroupeComplet(groupe.id);
+      if (groupeComplet) {
+        console.log('[handleAddressCreated] Groupe complet chargé:', groupeComplet);
+        setGroupeCree(groupeComplet);
       } else {
-        // Si la récupération échoue, utiliser le groupe de base
-        setCreatedGroupe(groupe);
-        await saveGroupeId(groupe.id);
+        console.warn('[handleAddressCreated] Impossible de charger le groupe complet, utilisation des données de base');
+        // Si le chargement échoue, utiliser les données de base
+        setGroupeCree({
+          id: groupe.id,
+          nom: groupe.nom,
+          demandes: [],
+        });
       }
     }
-  };
+  }, [saveGroupeCree, fetchGroupeComplet]);
 
   return (
     <ParallaxScrollView
@@ -232,30 +271,23 @@ export default function HomeScreen() {
         </ThemedView>
       </ThemedView>
 
-      {createdGroupe ? (
+      <CreateAddressForm onAddressCreated={handleAddressCreated} />
+      
+      {groupeCree && (
         <ThemedView style={styles.groupeContainer}>
+          <ThemedText type="subtitle">Groupe créé</ThemedText>
           <GroupeItem
-            groupe={createdGroupe}
+            groupe={groupeCree}
             authToken={authToken}
             currentUserId={currentUserId}
             allCompetences={allCompetences}
-            groupes={allGroupes}
+            groupes={[groupeCree]}
             addedCompetenceIds={addedCompetenceIds}
-            onUpdate={handleUpdate}
-            onAllCompetencesUpdate={handleAllCompetencesUpdate}
+            onUpdate={handleUpdateGroupe}
+            onAllCompetencesUpdate={fetchAllCompetences}
             onAddedCompetenceIdsUpdate={setAddedCompetenceIds}
           />
-          <Button
-            title="Créer une autre adresse"
-            onPress={async () => {
-              setCreatedGroupe(null);
-              await clearSavedGroupeId();
-            }}
-            color="#007AFF"
-          />
         </ThemedView>
-      ) : (
-        <CreateAddressForm onAddressCreated={handleAddressCreated} />
       )}
     </ParallaxScrollView>
   );
@@ -295,7 +327,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   groupeContainer: {
+    marginTop: 16,
+    padding: 16,
     gap: 12,
-    marginBottom: 16,
   },
 });
