@@ -38,7 +38,7 @@ class Demande
     #[Groups(['demande:read'])]
     private ?Groupe $groupe = null;
 
-    #[ORM\OneToMany(targetEntity: Competence::class, mappedBy: 'demande', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\ManyToMany(targetEntity: Competence::class, mappedBy: 'demandes')]
     #[Groups(['demande:read', 'groupe:read'])]
     private Collection $competences;
 
@@ -88,7 +88,7 @@ class Demande
     {
         if (!$this->competences->contains($competence)) {
             $this->competences->add($competence);
-            $competence->setDemande($this);
+            $competence->addDemande($this);
         }
 
         return $this;
@@ -97,9 +97,7 @@ class Demande
     public function removeCompetence(Competence $competence): static
     {
         if ($this->competences->removeElement($competence)) {
-            if ($competence->getDemande() === $this) {
-                $competence->setDemande(null);
-            }
+            $competence->removeDemande($this);
         }
 
         return $this;
