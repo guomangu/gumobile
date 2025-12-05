@@ -32,6 +32,7 @@ export default function HomeScreen() {
     loadAuthToken();
     fetchAllCompetences();
     fetchAllGroupes();
+    loadSavedGroupe();
   }, []);
 
   useEffect(() => {
@@ -98,6 +99,8 @@ export default function HomeScreen() {
       const updatedGroupe = await fetchGroupeById(createdGroupe.id);
       if (updatedGroupe) {
         setCreatedGroupe(updatedGroupe);
+        // S'assurer que l'ID reste sauvegardé après la mise à jour
+        await saveGroupeId(updatedGroupe.id);
       }
     }
     // Recharger aussi tous les groupes pour avoir les données complètes pour les propositions
@@ -149,15 +152,52 @@ export default function HomeScreen() {
     }
   };
 
+  const loadSavedGroupe = async () => {
+    try {
+      const savedGroupeId = await AsyncStorage.getItem('createdGroupeId');
+      if (savedGroupeId) {
+        const groupeId = parseInt(savedGroupeId, 10);
+        const groupe = await fetchGroupeById(groupeId);
+        if (groupe) {
+          setCreatedGroupe(groupe);
+        } else {
+          // Si le groupe n'existe plus, supprimer l'ID sauvegardé
+          await AsyncStorage.removeItem('createdGroupeId');
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement du groupe sauvegardé:', error);
+    }
+  };
+
+  const saveGroupeId = async (groupeId: number) => {
+    try {
+      await AsyncStorage.setItem('createdGroupeId', groupeId.toString());
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du groupe:', error);
+    }
+  };
+
+  const clearSavedGroupeId = async () => {
+    try {
+      await AsyncStorage.removeItem('createdGroupeId');
+    } catch (error) {
+      console.error('Erreur lors de la suppression du groupe sauvegardé:', error);
+    }
+  };
+
   const handleAddressCreated = async (groupe?: Groupe) => {
     if (groupe) {
       // Récupérer le groupe complet depuis l'API pour avoir toutes les données
       const fullGroupe = await fetchGroupeById(groupe.id);
       if (fullGroupe) {
         setCreatedGroupe(fullGroupe);
+        // Sauvegarder l'ID du groupe dans AsyncStorage
+        await saveGroupeId(fullGroupe.id);
       } else {
         // Si la récupération échoue, utiliser le groupe de base
         setCreatedGroupe(groupe);
+        await saveGroupeId(groupe.id);
       }
     }
   };
@@ -207,7 +247,10 @@ export default function HomeScreen() {
           />
           <Button
             title="Créer une autre adresse"
-            onPress={() => setCreatedGroupe(null)}
+            onPress={async () => {
+              setCreatedGroupe(null);
+              await clearSavedGroupeId();
+            }}
             color="#007AFF"
           />
         </ThemedView>
