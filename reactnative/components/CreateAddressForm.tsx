@@ -2,11 +2,12 @@ import { StyleSheet, Button, Alert } from 'react-native';
 import { useState } from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { importAddress, type BanAddressResult } from '@/constants/api';
+import { importAddress, type BanAddressResult, type Adresse } from '@/constants/api';
 import { AddressAutocomplete } from '@/components/address-autocomplete';
+import { type Groupe } from '@/components/types';
 
 interface CreateAddressFormProps {
-  onAddressCreated: () => void;
+  onAddressCreated: (groupe?: Groupe) => void;
 }
 
 export function CreateAddressForm({ onAddressCreated }: CreateAddressFormProps) {
@@ -33,7 +34,12 @@ export function CreateAddressForm({ onAddressCreated }: CreateAddressFormProps) 
       Alert.alert('Succès', message);
       setSelectedAddress(null);
       setComplementAdresse('');
-      onAddressCreated();
+      // Passer le groupe créé au callback si disponible
+      const groupe: Groupe | undefined = newAddress.groupe ? {
+        id: newAddress.groupe.id,
+        nom: newAddress.groupe.nom,
+      } : undefined;
+      onAddressCreated(groupe);
     } catch (error: any) {
       console.error('Erreur lors de la création de l\'adresse:', error);
       Alert.alert(

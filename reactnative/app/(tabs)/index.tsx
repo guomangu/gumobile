@@ -8,14 +8,26 @@ import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { CreateAddressForm } from '@/components/CreateAddressForm';
+import { GroupeItem } from '@/components/GroupeItem';
+import { getCompetences, getApiUrl, API_ENDPOINTS, type Competence as CompetenceApi } from '@/constants/api';
+import { type Groupe } from '@/components/types';
 
 export default function HomeScreen() {
   // États pour l'authentification
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [currentUserPseudo, setCurrentUserPseudo] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  
+  // État pour le groupe créé
+  const [createdGroupe, setCreatedGroupe] = useState<Groupe | null>(null);
+  
+  // États pour GroupeItem
+  const [allCompetences, setAllCompetences] = useState<CompetenceApi[]>([]);
+  const [addedCompetenceIds, setAddedCompetenceIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     loadAuthToken();
+    fetchAllCompetences();
   }, []);
 
   useEffect(() => {
@@ -28,9 +40,13 @@ export default function HomeScreen() {
   const loadAuthToken = async () => {
     try {
       const token = await AsyncStorage.getItem('authToken');
+      const userId = await AsyncStorage.getItem('userId');
       const userPseudo = await AsyncStorage.getItem('userPseudo');
       if (token) {
         setAuthToken(token);
+      }
+      if (userId) {
+        setCurrentUserId(parseInt(userId, 10));
       }
       if (userPseudo) {
         setCurrentUserPseudo(userPseudo);
@@ -38,6 +54,30 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Erreur lors du chargement du token:', error);
     }
+  };
+
+  const fetchAllCompetences = async () => {
+    try {
+      const data = await getCompetences();
+      setAllCompetences(Array.isArray(data) ? data : []);
+    } catch (error: any) {
+      console.error('Erreur lors de la récupération des compétences:', error);
+      setAllCompetences([]);
+    }
+  };
+
+  const handleUpdate = async () => {
+    // Recharger le groupe depuis l'API pour mettre à jour les données (demandes, users, etc.)
+    if (createdGroupe) {
+      const updatedGroupe = await fetchGroupeById(createdGroupe.id);
+      if (updatedGroupe) {
+        setCreatedGroupe(updatedGroupe);
+      }
+    }
+  };
+
+  const handleAllCompetencesUpdate = () => {
+    fetchAllCompetences();
   };
 
   const handleLogout = async () => {
@@ -54,8 +94,44 @@ export default function HomeScreen() {
     }
   };
 
-  const handleAddressCreated = () => {
-    // Cette fonction peut être utilisée pour rafraîchir les données si nécessaire
+  const fetchGroupeById = async (groupeId: number): Promise<Groupe | null> => {
+    try {
+      const response = await fetch(getApiUrl(`${API_ENDPOINTS.GROUPES}/${groupeId}`), {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        id: data.id,
+        nom: data.nom,
+        demandes: data.demandes || [],
+        users: data.users || [],
+        usersData: data.usersData || data.users || [],
+      };
+    } catch (error: any) {
+      console.error('Erreur lors de la récupération du groupe:', error);
+      return null;
+    }
+  };
+
+  const handleAddressCreated = async (groupe?: Groupe) => {
+    if (groupe) {
+      // Récupérer le groupe complet depuis l'API pour avoir toutes les données
+      const fullGroupe = await fetchGroupeById(groupe.id);
+      if (fullGroupe) {
+        setCreatedGroupe(fullGroupe);
+      } else {
+        // Si la récupération échoue, utiliser le groupe de base
+        setCreatedGroupe(groupe);
+      }
+    }
   };
 
   return (
@@ -88,7 +164,28 @@ export default function HomeScreen() {
         </ThemedView>
       </ThemedView>
 
-      <CreateAddressForm onAddressCreated={handleAddressCreated} />
+      {createdGroupe ? (
+        <ThemedView style={styles.groupeContainer}>
+          <GroupeItem
+            groupe={createdGroupe}
+            authToken={authToken}
+            currentUserId={currentUserId}
+            allCompetences={allCompetences}
+            groupes={[createdGroupe]}
+            addedCompetenceIds={addedCompetenceIds}
+            onUpdate={handleUpdate}
+            onAllCompetencesUpdate={handleAllCompetencesUpdate}
+            onAddedCompetenceIdsUpdate={setAddedCompetenceIds}
+          />
+          <Button
+            title="Créer une autre adresse"
+            onPress={() => setCreatedGroupe(null)}
+            color="#007AFF"
+          />
+        </ThemedView>
+      ) : (
+        <CreateAddressForm onAddressCreated={handleAddressCreated} />
+      )}
     </ParallaxScrollView>
   );
 }
@@ -125,5 +222,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     position: 'absolute',
+  },
+  groupeContainer: {
+    gap: 12,
+    marginBottom: 16,
   },
 });
