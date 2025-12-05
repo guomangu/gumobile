@@ -21,6 +21,9 @@ export default function HomeScreen() {
   // État pour le groupe créé
   const [createdGroupe, setCreatedGroupe] = useState<Groupe | null>(null);
   
+  // État pour tous les groupes (nécessaire pour les propositions de compétences)
+  const [allGroupes, setAllGroupes] = useState<Groupe[]>([]);
+  
   // États pour GroupeItem
   const [allCompetences, setAllCompetences] = useState<CompetenceApi[]>([]);
   const [addedCompetenceIds, setAddedCompetenceIds] = useState<Set<number>>(new Set());
@@ -28,6 +31,7 @@ export default function HomeScreen() {
   useEffect(() => {
     loadAuthToken();
     fetchAllCompetences();
+    fetchAllGroupes();
   }, []);
 
   useEffect(() => {
@@ -66,6 +70,28 @@ export default function HomeScreen() {
     }
   };
 
+  const fetchAllGroupes = async () => {
+    try {
+      const response = await fetch(getApiUrl(API_ENDPOINTS.GROUPES), {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const groupesList = data['hydra:member'] || data || [];
+      setAllGroupes(Array.isArray(groupesList) ? groupesList : []);
+    } catch (error: any) {
+      console.error('Erreur lors de la récupération des groupes:', error);
+      setAllGroupes([]);
+    }
+  };
+
   const handleUpdate = async () => {
     // Recharger le groupe depuis l'API pour mettre à jour les données (demandes, users, etc.)
     if (createdGroupe) {
@@ -74,6 +100,8 @@ export default function HomeScreen() {
         setCreatedGroupe(updatedGroupe);
       }
     }
+    // Recharger aussi tous les groupes pour avoir les données complètes pour les propositions
+    await fetchAllGroupes();
   };
 
   const handleAllCompetencesUpdate = () => {
@@ -171,7 +199,7 @@ export default function HomeScreen() {
             authToken={authToken}
             currentUserId={currentUserId}
             allCompetences={allCompetences}
-            groupes={[createdGroupe]}
+            groupes={allGroupes}
             addedCompetenceIds={addedCompetenceIds}
             onUpdate={handleUpdate}
             onAllCompetencesUpdate={handleAllCompetencesUpdate}

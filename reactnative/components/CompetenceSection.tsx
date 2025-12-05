@@ -1,11 +1,11 @@
 import { StyleSheet, TextInput, Button, Alert, TouchableOpacity } from 'react-native';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { getApiUrl, API_ENDPOINTS, type Competence as CompetenceApi } from '@/constants/api';
 import { type Competence } from './types';
-import { proposeCompetencesFromDemande } from './competence-utils';
+import { proposeCompetencesFromDemande, proposeNewWordsFromDemande } from './competence-utils';
 
 interface CompetenceSectionProps {
   demandeId: number;
@@ -34,6 +34,8 @@ export function CompetenceSection({
 }: CompetenceSectionProps) {
   const [competenceNom, setCompetenceNom] = useState('');
   const [loadingCompetence, setLoadingCompetence] = useState(false);
+  // État local pour retirer immédiatement les compétences ajoutées des propositions
+  const [locallyAddedCompetenceIds, setLocallyAddedCompetenceIds] = useState<Set<number>>(new Set());
   
   const textColor = useThemeColor({}, 'text');
   const borderColor = useThemeColor({}, 'icon');
@@ -65,7 +67,7 @@ export function CompetenceSection({
         },
         body: JSON.stringify({
           nom: nom,
-          demande: `/api/demandes/${demandeId}`,
+          demandes: [`/api/demandes/${demandeId}`],
         }),
       });
 
@@ -75,11 +77,12 @@ export function CompetenceSection({
       }
 
       const newCompetence = await response.json();
+      const addedId = competenceId || newCompetence.id;
 
-      if (competenceId) {
-        onAddedCompetenceIdsUpdate(new Set([...addedCompetenceIds, competenceId]));
-      } else if (newCompetence.id) {
-        onAddedCompetenceIdsUpdate(new Set([...addedCompetenceIds, newCompetence.id]));
+      // Ajouter immédiatement à l'état local pour retirer de la liste des propositions
+      if (addedId) {
+        setLocallyAddedCompetenceIds(prev => new Set([...prev, addedId]));
+        onAddedCompetenceIdsUpdate(new Set([...addedCompetenceIds, addedId]));
       }
 
       if (!nomCompetence) {
@@ -87,12 +90,18 @@ export function CompetenceSection({
       }
       
       setCompetenceNom('');
+      
+      // Recharger les données pour mettre à jour les compétences de la demande
+      // Cela permettra de recalculer les propositions avec la nouvelle compétence liée
       onUpdate();
       onAllCompetencesUpdate();
       
+      // Réinitialiser les IDs ajoutés après un court délai pour permettre le rechargement
+      // Les propositions seront recalculées automatiquement grâce à useMemo quand competences change
       setTimeout(() => {
         onAddedCompetenceIdsUpdate(new Set());
-      }, 100);
+        setLocallyAddedCompetenceIds(new Set());
+      }, 300);
     } catch (error: any) {
       console.error('Erreur lors de la création de la compétence:', error);
       Alert.alert('Erreur', error.message || 'Une erreur est survenue lors de la création de la compétence');
@@ -101,14 +110,34 @@ export function CompetenceSection({
     }
   };
 
-  const proposedCompetences = proposeCompetencesFromDemande(
-    demandeTexte,
-    competences,
-    demandeGroupeId,
-    allCompetences,
-    groupes,
-    addedCompetenceIds
-  );
+  // Combiner les IDs ajoutés globalement et localement pour filtrer les propositions
+  const combinedAddedIds = useMemo(() => {
+    return new Set([...addedCompetenceIds, ...locallyAddedCompetenceIds]);
+  }, [addedCompetenceIds, locallyAddedCompetenceIds]);
+
+  // Utiliser useMemo pour recalculer les propositions quand les dépendances changent
+  // Les propositions sont recalculées automatiquement quand competences change
+  // Cela permet de proposer les compétences associées au tag nouvellement lié
+  const proposedCompetences = useMemo(() => {
+    return proposeCompetencesFromDemande(
+      demandeTexte,
+      competences,
+      demandeGroupeId,
+      allCompetences,
+      groupes,
+      combinedAddedIds
+    );
+  }, [demandeTexte, competences, demandeGroupeId, allCompetences, groupes, combinedAddedIds]);
+
+  // Proposer des nouveaux mots de la demande qui ne sont pas dans la DB
+  const proposedNewWords = useMemo(() => {
+    return proposeNewWordsFromDemande(
+      demandeTexte,
+      competences,
+      allCompetences,
+      combinedAddedIds
+    );
+  }, [demandeTexte, competences, allCompetences, combinedAddedIds]);
 
   return (
     <>
@@ -142,6 +171,32 @@ export function CompetenceSection({
               >
                 <ThemedText style={styles.proposedCompetenceTagText}>
                   {competence.nom}
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </ThemedView>
+        </ThemedView>
+      )}
+
+      {/* Propositions de nouveaux mots de la demande */}
+      {proposedNewWords.length > 0 && (
+        <ThemedView style={styles.proposedNewWordsContainer}>
+          <ThemedText style={styles.proposedNewWordsLabel}>
+            Mots de la demande (nouveaux tags):
+          </ThemedText>
+          <ThemedView style={styles.proposedNewWordsTags}>
+            {proposedNewWords.map((word, index) => (
+              <TouchableOpacity
+                key={`${word}-${index}`}
+                style={[styles.proposedNewWordTag, { borderColor }]}
+                onPress={() => {
+                  setCompetenceNom(word);
+                  handleCreateCompetence(word);
+                }}
+                disabled={loadingCompetence}
+              >
+                <ThemedText style={styles.proposedNewWordTagText}>
+                  {word}
                 </ThemedText>
               </TouchableOpacity>
             ))}
@@ -247,6 +302,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: 'rgba(0,122,255,0.9)',
+  },
+  proposedNewWordsContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+    gap: 8,
+  },
+  proposedNewWordsLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    opacity: 0.7,
+  },
+  proposedNewWordsTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  proposedNewWordTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,149,0,0.1)',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  proposedNewWordTagText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255,149,0,0.9)',
   },
 });
 

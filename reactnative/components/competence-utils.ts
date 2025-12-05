@@ -1,6 +1,19 @@
 import { type Competence, type Groupe } from './types';
 import { type Competence as CompetenceApi } from '@/constants/api';
 
+// Liste des mots vides (stop words) en français (partagée)
+const STOP_WORDS = new Set([
+  'le', 'la', 'les', 'un', 'une', 'des', 'de', 'du', 'd', 'et', 'ou', 'mais', 'donc', 'car', 'ne', 'pas',
+  'pour', 'par', 'avec', 'sans', 'sur', 'sous', 'dans', 'entre', 'vers', 'chez', 'à', 'au', 'aux',
+  'ce', 'cette', 'ces', 'se', 'te', 'me', 'nous', 'vous', 'ils', 'elles', 'il', 'elle', 'on',
+  'qui', 'que', 'quoi', 'où', 'quand', 'comment', 'pourquoi', 'est', 'sont', 'être', 'avoir',
+  'faire', 'aller', 'venir', 'voir', 'savoir', 'vouloir', 'pouvoir', 'devoir', 'falloir',
+  'très', 'plus', 'moins', 'aussi', 'bien', 'mal', 'mieux', 'beaucoup', 'peu', 'trop',
+  'tout', 'tous', 'toute', 'toutes', 'rien', 'personne', 'quelque', 'chaque',
+  'mon', 'ma', 'mes', 'ton', 'ta', 'tes', 'son', 'sa', 'ses', 'notre', 'votre', 'leur',
+  'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles'
+]);
+
 // Fonction pour proposer des compétences existantes de la DB basées sur le texte de la demande
 export function proposeCompetencesFromDemande(
   texte: string,
@@ -10,18 +23,6 @@ export function proposeCompetencesFromDemande(
   groupes: Groupe[],
   addedCompetenceIds: Set<number>
 ): CompetenceApi[] {
-  // Liste des mots vides (stop words) en français
-  const stopWords = new Set([
-    'le', 'la', 'les', 'un', 'une', 'des', 'de', 'du', 'd', 'et', 'ou', 'mais', 'donc', 'car', 'ne', 'pas',
-    'pour', 'par', 'avec', 'sans', 'sur', 'sous', 'dans', 'entre', 'vers', 'chez', 'à', 'au', 'aux',
-    'ce', 'cette', 'ces', 'se', 'te', 'me', 'nous', 'vous', 'ils', 'elles', 'il', 'elle', 'on',
-    'qui', 'que', 'quoi', 'où', 'quand', 'comment', 'pourquoi', 'est', 'sont', 'être', 'avoir',
-    'faire', 'aller', 'venir', 'voir', 'savoir', 'vouloir', 'pouvoir', 'devoir', 'falloir',
-    'très', 'plus', 'moins', 'aussi', 'bien', 'mal', 'mieux', 'beaucoup', 'peu', 'trop',
-    'tout', 'tous', 'toute', 'toutes', 'rien', 'personne', 'quelque', 'chaque',
-    'mon', 'ma', 'mes', 'ton', 'ta', 'tes', 'son', 'sa', 'ses', 'notre', 'votre', 'leur',
-    'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles'
-  ]);
 
   // Nettoyer et extraire les mots du texte
   const texteWords = texte
@@ -30,7 +31,7 @@ export function proposeCompetencesFromDemande(
     .split(/\s+/)
     .filter(word => 
       word.length >= 3 &&
-      !stopWords.has(word) &&
+      !STOP_WORDS.has(word) &&
       !/^\d+$/.test(word)
     );
 
@@ -117,5 +118,50 @@ export function proposeCompetencesFromDemande(
     .sort((a, b) => b.score - a.score)
     .slice(0, 10)
     .map(item => item.compétence);
+}
+
+// Fonction pour proposer des mots de la demande qui ne sont pas dans la DB
+export function proposeNewWordsFromDemande(
+  texte: string,
+  existingCompetences: Competence[] = [],
+  allCompetences: CompetenceApi[],
+  addedCompetenceIds: Set<number>
+): string[] {
+  // Nettoyer et extraire les mots du texte
+  const texteWords = texte
+    .toLowerCase()
+    .replace(/[^\w\sàâäéèêëïîôöùûüÿç]/g, ' ')
+    .split(/\s+/)
+    .filter(word => 
+      word.length >= 3 &&
+      !STOP_WORDS.has(word) &&
+      !/^\d+$/.test(word)
+    );
+
+  // Récupérer tous les noms de compétences existantes (de la DB et de la demande)
+  const allCompetenceNames = new Set<string>();
+  
+  // Ajouter les compétences de la DB
+  allCompetences.forEach(comp => {
+    if (!addedCompetenceIds.has(comp.id)) {
+      allCompetenceNames.add(comp.nom.toLowerCase().trim());
+    }
+  });
+  
+  // Ajouter les compétences déjà liées à cette demande
+  existingCompetences.forEach(comp => {
+    allCompetenceNames.add(comp.nom.toLowerCase().trim());
+  });
+
+  // Filtrer les mots qui ne sont pas déjà des compétences
+  const newWords = texteWords.filter(word => {
+    const wordLower = word.toLowerCase().trim();
+    return !allCompetenceNames.has(wordLower);
+  });
+
+  // Retourner les mots uniques, triés par longueur (les plus longs en premier)
+  return Array.from(new Set(newWords))
+    .sort((a, b) => b.length - a.length)
+    .slice(0, 10);
 }
 
