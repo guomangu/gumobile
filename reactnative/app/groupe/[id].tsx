@@ -1,253 +1,288 @@
-import { StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { StyleSheet, ActivityIndicator, TouchableOpacity, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { getApiUrl, API_ENDPOINTS, getCompetences, type Competence as CompetenceApi, type Adresse } from '@/constants/api';
-import { type Groupe } from '@/components/types';
-import { UserSection } from '@/components/UserSection';
-import { DemandeSection } from '@/components/DemandeSection';
-import { AddressTag } from '@/components/AddressTag';
-import { authEvents, AUTH_EVENTS } from '@/utils/authEvents';
+import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { getApiUrl, API_ENDPOINTS } from '@/constants/api';
+import { useThemeColor } from '@/hooks/use-theme-color';
+
+interface GroupDetail {
+  id: number;
+  nom: string;
+  type?: string;
+  adresses?: {
+    id: number;
+    valeur: string;
+    latitude?: number;
+    longitude?: number;
+  }[];
+  demandes?: {
+    id: number;
+    texte: string;
+    competences?: {
+      id: number;
+      nom: string;
+    }[];
+  }[];
+  usersData?: {
+    id: number;
+    pseudo: string;
+    mail: string;
+  }[];
+  users?: { // Fallback if usersData is not populated or for different API serialization
+    id: number;
+    pseudo: string;
+    mail: string;
+  }[];
+}
 
 export default function GroupeDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams();
   const router = useRouter();
-  const [groupe, setGroupe] = useState<Groupe | null>(null);
+  const [groupe, setGroupe] = useState<GroupDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authToken, setAuthToken] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-  const [allCompetences, setAllCompetences] = useState<CompetenceApi[]>([]);
-  const [addedCompetenceIds, setAddedCompetenceIds] = useState<Set<number>>(new Set());
+  const [error, setError] = useState<string | null>(null);
 
-  const loadAuthState = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      const userId = await AsyncStorage.getItem('userId');
-      setAuthToken(token);
-      if (userId) {
-        setCurrentUserId(parseInt(userId, 10));
-      } else {
-        setCurrentUserId(null);
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement de l\'état d\'authentification:', error);
-    }
-  }, []);
-
-  const fetchGroupe = useCallback(async () => {
-    if (!id) return;
-
-    setLoading(true);
-    try {
-      const groupeId = parseInt(id, 10);
-      const response = await fetch(getApiUrl(`${API_ENDPOINTS.GROUPES}/${groupeId}`), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          setGroupe(null);
-          setLoading(false);
-          return;
-        }
-        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      setGroupe(data);
-    } catch (error: any) {
-      console.error('Erreur lors du chargement du groupe:', error);
-      setGroupe(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  const fetchAllCompetences = useCallback(async () => {
-    try {
-      const data = await getCompetences();
-      setAllCompetences(Array.isArray(data) ? data : []);
-    } catch (error: any) {
-      console.error('Erreur lors de la récupération des compétences:', error);
-      setAllCompetences([]);
-    }
-  }, []);
+  const textColor = useThemeColor({}, 'text');
+  const iconColor = useThemeColor({}, 'icon');
 
   useEffect(() => {
-    loadAuthState();
-    fetchAllCompetences();
-  }, [loadAuthState, fetchAllCompetences]);
-
-  useEffect(() => {
-    if (id) {
-      fetchGroupe();
-    }
-  }, [id, fetchGroupe]);
-
-  // Écouter les événements d'authentification
-  useFocusEffect(
-    useCallback(() => {
-      loadAuthState();
+    const fetchGroupe = async () => {
+      if (!id) return;
       
-      const handleAuthChange = () => {
-        loadAuthState();
-        fetchGroupe();
-      };
+      try {
+        setLoading(true);
+        const response = await fetch(getApiUrl(`${API_ENDPOINTS.GROUPES}/${id}`), {
+          headers: { 'Accept': 'application/json' }
+        });
 
-      authEvents.on(AUTH_EVENTS.LOGIN, handleAuthChange);
-      authEvents.on(AUTH_EVENTS.LOGOUT, handleAuthChange);
+        if (!response.ok) {
+          throw new Error(`Erreur ${response.status}: Impossible de charger le groupe`);
+        }
 
-      return () => {
-        authEvents.off(AUTH_EVENTS.LOGIN, handleAuthChange);
-        authEvents.off(AUTH_EVENTS.LOGOUT, handleAuthChange);
-      };
-    }, [loadAuthState, fetchGroupe])
-  );
+        const data = await response.json();
+        setGroupe(data);
+      } catch (err: any) {
+        console.error('Erreur chargement groupe:', err);
+        setError(err.message || 'Une erreur est survenue');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleUpdate = useCallback(() => {
     fetchGroupe();
-  }, [fetchGroupe]);
-
-  const handleAllCompetencesUpdate = useCallback(() => {
-    fetchAllCompetences();
-  }, [fetchAllCompetences]);
+  }, [id]);
 
   if (loading) {
     return (
-      <ParallaxScrollView
-        headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}>
-        <ThemedView style={styles.container} cloudStyle={false}>
-          <ActivityIndicator size="large" color="#000000" />
-          <ThemedText style={styles.loadingText}>Chargement...</ThemedText>
-        </ThemedView>
-      </ParallaxScrollView>
+      <ThemedView style={styles.centered}>
+        <ActivityIndicator size="large" />
+      </ThemedView>
     );
   }
 
-  if (!groupe) {
+  if (error || !groupe) {
     return (
-      <ParallaxScrollView
-        headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}>
-        <ThemedView style={styles.container} cloudStyle={false}>
-          <ThemedText type="title">Groupe introuvable</ThemedText>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <ThemedText style={styles.backButtonText}>Retour</ThemedText>
-          </TouchableOpacity>
-        </ThemedView>
-      </ParallaxScrollView>
+      <ThemedView style={styles.centered}>
+        <ThemedText>Groupe introuvable ou erreur de chargement.</ThemedText>
+        <ThemedText style={styles.errorText}>{error}</ThemedText>
+      </ThemedView>
     );
   }
 
   const users = groupe.usersData || groupe.users || [];
-  
-  // Convertir les adresses du groupe en format Adresse pour AddressTag
-  const groupeAdresses: Adresse[] = (groupe.adresses || []).map(addr => ({
-    id: addr.id,
-    type: addr.type as Adresse['type'],
-    valeur: addr.valeur,
-  }));
+  const isOffre = groupe.type === 'OFFRE';
+  const badgeColor = isOffre ? '#34C759' : '#007AFF';
+  const badgeText = isOffre ? 'Offre' : 'Demande';
 
   return (
     <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}>
-      <ThemedView style={styles.container} cloudStyle={false}>
-        <ThemedView style={styles.groupeHeader}>
-          <ThemedText type="title" style={styles.groupeTitle}>
-            {groupe.nom}
-          </ThemedText>
-          <ThemedText style={styles.groupeId}>ID: {groupe.id}</ThemedText>
+      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
+      headerImage={
+        <IconSymbol
+          size={100}
+          color="#808080"
+          name="person.3.fill"
+          style={styles.headerImage}
+        />
+      }>
+      
+      <ThemedView style={styles.headerContainer}>
+        <ThemedView style={styles.titleRow}>
+            <ThemedText type="title" style={{flex: 1}}>{groupe.nom}</ThemedText>
+            {groupe.type && (
+                <ThemedView style={[styles.badge, { backgroundColor: badgeColor }]}>
+                    <ThemedText style={styles.badgeText}>{badgeText}</ThemedText>
+                </ThemedView>
+            )}
         </ThemedView>
-
-        {/* Affichage des adresses comme tags cliquables */}
-        {groupeAdresses.length > 0 && (
-          <ThemedView style={styles.addressesSection}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>Adresses</ThemedText>
-            <ThemedView style={styles.addressesTags}>
-              {groupeAdresses.map((adresse) => (
-                <AddressTag key={adresse.id} adresse={adresse} />
-              ))}
-            </ThemedView>
-          </ThemedView>
-        )}
-
-        <DemandeSection
-          groupeId={groupe.id}
-          demandes={groupe.demandes || []}
-          allCompetences={allCompetences}
-          groupes={[groupe]}
-          addedCompetenceIds={addedCompetenceIds}
-          currentUserId={currentUserId}
-          groupeUsers={users}
-          onUpdate={handleUpdate}
-          onAllCompetencesUpdate={handleAllCompetencesUpdate}
-          onAddedCompetenceIdsUpdate={setAddedCompetenceIds}
-        />
-
-        <UserSection
-          groupeId={groupe.id}
-          users={users}
-          authToken={authToken}
-          currentUserId={currentUserId}
-          onUpdate={handleUpdate}
-          onLoginSuccess={loadAuthState}
-        />
       </ThemedView>
+
+      {/* Adresses */}
+      <ThemedView style={styles.section}>
+        <ThemedText type="subtitle" style={styles.sectionTitle}>Localisation</ThemedText>
+        {groupe.adresses && groupe.adresses.length > 0 ? (
+            groupe.adresses.map((addr, index) => (
+                <ThemedView key={index} style={styles.infoRow}>
+                    <IconSymbol name="house.fill" size={16} color={textColor} />
+                    <ThemedText>{addr.valeur}</ThemedText>
+                </ThemedView>
+            ))
+        ) : (
+            <ThemedText style={styles.italicText}>Aucune adresse renseignée.</ThemedText>
+        )}
+      </ThemedView>
+
+      {/* Membres */}
+      <ThemedView style={styles.section}>
+        <ThemedText type="subtitle" style={styles.sectionTitle}>Membres ({users.length})</ThemedText>
+        {users.length > 0 ? (
+            <ThemedView style={styles.usersList}>
+                {users.map((user) => (
+                    <TouchableOpacity 
+                        key={user.id} 
+                        style={styles.userChip}
+                        onPress={() => router.push(`/profil/${user.id}`)}
+                    >
+                        <IconSymbol name="person.fill" size={12} color={textColor} />
+                        <ThemedText style={styles.userText}>{user.pseudo}</ThemedText>
+                    </TouchableOpacity>
+                ))}
+            </ThemedView>
+        ) : (
+            <ThemedText style={styles.italicText}>Aucun membre visible.</ThemedText>
+        )}
+      </ThemedView>
+
+      {/* Description / Demandes */}
+      <ThemedView style={styles.section}>
+        <ThemedText type="subtitle" style={styles.sectionTitle}>Description & Compétences</ThemedText>
+        {groupe.demandes && groupe.demandes.length > 0 ? (
+            groupe.demandes.map((demande) => (
+                <ThemedView key={demande.id} style={styles.demandeCard}>
+                    <ThemedText style={styles.demandeText}>{demande.texte}</ThemedText>
+                    
+                    {demande.competences && demande.competences.length > 0 && (
+                        <ThemedView style={styles.tagsContainer}>
+                            {demande.competences.map((comp) => (
+                                <ThemedView key={comp.id} style={styles.tag}>
+                                    <ThemedText style={styles.tagText}>{comp.nom}</ThemedText>
+                                </ThemedView>
+                            ))}
+                        </ThemedView>
+                    )}
+                </ThemedView>
+            ))
+        ) : (
+            <ThemedText style={styles.italicText}>Aucune description disponible.</ThemedText>
+        )}
+      </ThemedView>
+
     </ParallaxScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  centered: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
-    gap: 24,
   },
-  loadingText: {
-    marginTop: 12,
+  errorText: {
+    color: 'red',
+    marginTop: 10,
     textAlign: 'center',
   },
-  groupeHeader: {
-    gap: 8,
-    paddingBottom: 16,
+  headerImage: {
+    position: 'absolute',
+    bottom: -20,
+    left: 20,
   },
-  groupeTitle: {
-    marginBottom: 4,
+  headerContainer: {
+    marginBottom: 20,
   },
-  groupeId: {
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  badgeText: {
+    color: 'white',
     fontSize: 12,
-    opacity: 0.6,
+    fontWeight: 'bold',
   },
-  addressesSection: {
-    gap: 12,
-    marginTop: 8,
+  section: {
+    marginBottom: 24,
+    gap: 8,
   },
   sectionTitle: {
     marginBottom: 8,
+    opacity: 0.8,
   },
-  addressesTags: {
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  italicText: {
+    fontStyle: 'italic',
+    opacity: 0.6,
+  },
+  usersList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  backButton: {
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  userChip: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 20,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(150, 150, 150, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(150, 150, 150, 0.2)',
   },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  userText: {
+    fontSize: 14,
+  },
+  demandeCard: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(150, 150, 150, 0.1)',
+    gap: 12,
+  },
+  demandeText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  tag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#E5E5EA',
+  },
+  tagText: {
+    fontSize: 12,
+    color: '#333',
   },
 });
-

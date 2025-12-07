@@ -33,6 +33,10 @@ class Groupe
     #[Groups(['adresse:read', 'groupe:read'])]
     private ?string $nom = null;
 
+    #[ORM\Column(length: 50, nullable: true)]
+    #[Groups(["groupe:read", "adresse:read"])]
+    private ?string $type = null;
+
     #[ORM\ManyToMany(targetEntity: Adresse::class, mappedBy: 'groupes')]
     #[Groups(['groupe:read'])]
     private Collection $adresses;
@@ -64,6 +68,18 @@ class Groupe
     public function setNom(string $nom): static
     {
         $this->nom = $nom;
+
+        return $this;
+    }
+
+    public function getType(): ?string
+    {
+        return $this->type;
+    }
+
+    public function setType(?string $type): static
+    {
+        $this->type = $type;
 
         return $this;
     }

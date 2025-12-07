@@ -1,6 +1,7 @@
-import { StyleSheet, Alert, Platform, TouchableOpacity, View, TextInput, ActivityIndicator } from 'react-native';
+import { StyleSheet, Alert, Platform, TouchableOpacity, Pressable, View, TextInput, ActivityIndicator } from 'react-native';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { importAddress, reverseGeocode, type BanAddressResult, type Adresse, getApiUrl, API_ENDPOINTS, getCompetences, type Competence as CompetenceApi } from '@/constants/api';
@@ -16,6 +17,8 @@ interface ProposeWorkFormProps {
 }
 
 export function ProposeWorkForm({ onAddressCreated }: ProposeWorkFormProps) {
+  const router = useRouter();
+  
   // États du formulaire
   const [demandeTexte, setDemandeTexte] = useState('');
   const [competenceNom, setCompetenceNom] = useState('');
@@ -26,9 +29,8 @@ export function ProposeWorkForm({ onAddressCreated }: ProposeWorkFormProps) {
   
   // États locaux (Tunnel)
   const [localCompetences, setLocalCompetences] = useState<{nom: string, id?: number}[]>([]);
-  const [signupPseudo, setSignupPseudo] = useState('');
-  const [signupMail, setSignupMail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
+  const [authMail, setAuthMail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
   
   // États API / Loading
   const [allCompetences, setAllCompetences] = useState<CompetenceApi[]>([]);
@@ -131,16 +133,30 @@ export function ProposeWorkForm({ onAddressCreated }: ProposeWorkFormProps) {
 
   // Logique de validation finale
   const handleProposeTravail = async () => {
-    if (!selectedAddress) { Alert.alert('Erreur', 'Veuillez sélectionner une adresse'); return; }
-    const safeTexte = demandeTexte || '';
-    if (!safeTexte.trim()) { Alert.alert('Erreur', 'Veuillez décrire le travail proposé'); return; }
+    console.log('[ProposeWorkForm] === handleProposeTravail appelée ===');
+    console.log('[ProposeWorkForm] selectedAddress:', selectedAddress?.label);
+    console.log('[ProposeWorkForm] demandeTexte:', demandeTexte);
+    console.log('[ProposeWorkForm] authToken:', authToken ? 'présent' : 'absent');
+    console.log('[ProposeWorkForm] authMail:', authMail);
     
-    const safePseudo = signupPseudo || '';
-    const safeMail = signupMail || '';
-    const safePassword = signupPassword || '';
+    if (!selectedAddress) { 
+        const msg = 'Veuillez sélectionner une adresse'; 
+        Platform.OS === 'web' ? alert(msg) : Alert.alert('Erreur', msg); 
+        return; 
+    }
+    const safeTexte = demandeTexte || '';
+    if (!safeTexte.trim()) { 
+        const msg = 'Veuillez décrire le travail proposé'; 
+        Platform.OS === 'web' ? alert(msg) : Alert.alert('Erreur', msg); 
+        return; 
+    }
+    
+    const safeMail = authMail || '';
+    const safePassword = authPassword || '';
 
-    if (!authToken && (!safePseudo.trim() || !safeMail.trim() || !safePassword.trim())) {
-        Alert.alert('Erreur', 'Veuillez remplir les informations de création de compte');
+    if (!authToken && (!safeMail.trim() || !safePassword.trim())) {
+        const msg = 'Veuillez entrer votre email et mot de passe';
+        Platform.OS === 'web' ? alert(msg) : Alert.alert('Erreur', msg);
         return;
     }
 
@@ -149,43 +165,51 @@ export function ProposeWorkForm({ onAddressCreated }: ProposeWorkFormProps) {
     let finalUserId = currentUserId;
 
     try {
-        // 1. Auth
+        // 1. Auth (connexion ou création automatique via /api/auth)
         if (!finalAuthToken) {
-            const signupResponse = await fetch(getApiUrl(API_ENDPOINTS.USERS), {
+            const authResponse = await fetch(getApiUrl('auth'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ pseudo: safePseudo.trim(), password: safePassword.trim(), mail: safeMail.trim() }),
+                body: JSON.stringify({ mail: safeMail.trim(), password: safePassword.trim() }),
             });
-            if (!signupResponse.ok) throw new Error('Erreur création compte');
-            const signupData = await signupResponse.json();
             
-            if (signupData.token && signupData.user?.id) {
-                finalAuthToken = signupData.token;
-                finalUserId = signupData.user.id;
-            } else {
-                // Fallback Login
-                const loginResponse = await fetch(getApiUrl('login'), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pseudo: safePseudo.trim(), password: safePassword.trim() }),
-                });
-                if (!loginResponse.ok) throw new Error('Compte créé mais échec connexion');
-                const loginData = await loginResponse.json();
-                finalAuthToken = loginData.token;
-                finalUserId = loginData.user.id;
+            const authData = await authResponse.json();
+            
+            if (!authResponse.ok) {
+                throw new Error(authData.error || 'Erreur d\'authentification');
             }
             
-            if (finalAuthToken && finalUserId) {
-                await AsyncStorage.setItem('authToken', finalAuthToken);
-                await AsyncStorage.setItem('userId', finalUserId.toString());
+            if (authData.token && authData.user?.id) {
+                finalAuthToken = authData.token;
+                finalUserId = authData.user.id;
+                
+                await AsyncStorage.setItem('authToken', authData.token);
+                await AsyncStorage.setItem('userId', String(authData.user.id));
+                await AsyncStorage.setItem('userMail', authData.user.mail || '');
                 authEvents.emit(AUTH_EVENTS.LOGIN);
+                console.log('[ProposeWorkForm] Authentification réussie, userId:', finalUserId);
+            } else {
+                throw new Error('Réponse d\'authentification invalide');
             }
         }
+        
+        // Vérifier que l'authentification est valide
+        if (!finalAuthToken || !finalUserId) {
+            throw new Error('Authentification requise');
+        }
+        
+        console.log('[ProposeWorkForm] Token final: présent, userId:', finalUserId);
 
         // 2. Création Groupe (Adresse)
-        const newAddress = await importAddress(selectedAddress.label);
+        console.log('[ProposeWorkForm] Création du groupe pour:', selectedAddress.label);
+        const newAddress = await importAddress(selectedAddress.label, undefined, 'OFFRE');
+        console.log('[ProposeWorkForm] Réponse importAddress:', JSON.stringify(newAddress));
         const groupeId = newAddress.groupe?.id;
-        if (!groupeId) throw new Error('Erreur création groupe adresse');
+        if (!groupeId) {
+            console.error('[ProposeWorkForm] Pas de groupe.id dans la réponse:', newAddress);
+            throw new Error('Erreur création groupe adresse');
+        }
+        console.log('[ProposeWorkForm] Groupe créé avec ID:', groupeId);
 
         // 3. Création Demande (liée au Groupe)
         const demandeResponse = await fetch(getApiUrl(API_ENDPOINTS.DEMANDES), {
@@ -197,7 +221,10 @@ export function ProposeWorkForm({ onAddressCreated }: ProposeWorkFormProps) {
                 // Pas de user lié à la demande, car c'est la demande du GROUPE
             }),
         });
-        if (!demandeResponse.ok) throw new Error('Erreur création demande');
+        if (!demandeResponse.ok) {
+            const errorText = await demandeResponse.text();
+            throw new Error(`Erreur création demande: ${demandeResponse.status} ${errorText}`);
+        }
         const newDemande = await demandeResponse.json();
         const demandeId = newDemande.id || parseInt(newDemande['@id']?.split('/').pop() || '0');
 
@@ -217,33 +244,37 @@ export function ProposeWorkForm({ onAddressCreated }: ProposeWorkFormProps) {
         });
         if (userResponse.ok) {
             const userData = await userResponse.json();
-            const currentGroupes = (userData.groupes || []).map((g: any) => typeof g === 'string' ? g : `/api/groupes/${g.id}`);
+            // L'API retourne groupesData (pas groupes) pour la lecture
+            const existingGroupes = userData.groupesData || userData.groupes || [];
+            const currentGroupes = existingGroupes.map((g: any) => 
+                typeof g === 'string' ? g : `/api/groupes/${g.id}`
+            );
             const newGroupesList = [...currentGroupes, `/api/groupes/${groupeId}`];
             
             await fetch(getApiUrl(`${API_ENDPOINTS.USERS}/${finalUserId}`), {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/merge-patch+json', 'Authorization': `Bearer ${finalAuthToken}` },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${finalAuthToken}` },
                 body: JSON.stringify({ groupes: newGroupesList })
             });
         }
 
-        Alert.alert('Succès', 'Travail proposé avec succès !');
+        // Rafraichir l'état local
+        setAuthToken(finalAuthToken);
+        setCurrentUserId(finalUserId);
+        setLocalCompetences([]);
         
-        // Callback vers le parent
-        if (newAddress.groupe) {
-             const groupeResult: Groupe = {
-                id: newAddress.groupe.id,
-                nom: newAddress.groupe.nom,
-                adresses: newAddress.groupe.adresses?.map(addr => ({ id: addr.id, type: addr.type, valeur: addr.valeur })),
-             };
-             onAddressCreated(groupeResult);
-        } else {
-            onAddressCreated(undefined);
-        }
+        // Callback pour le parent
+        if (onAddressCreated) onAddressCreated(newAddress.groupe);
+        
+        // Redirection vers la page du groupe nouvellement créé
+        console.log('[ProposeWorkForm] === SUCCÈS === Redirection vers /groupe/' + groupeId);
+        router.push(`/groupe/${groupeId}`);
 
     } catch (e: any) {
+        console.error('[ProposeWorkForm] === ERREUR ===', e);
         handleApiError(e);
     } finally {
+        console.log('[ProposeWorkForm] === FIN ===');
         setLoadingAction(false);
     }
   };
@@ -406,23 +437,45 @@ export function ProposeWorkForm({ onAddressCreated }: ProposeWorkFormProps) {
       <ThemedView style={styles.section}>
         <ThemedText style={styles.sectionLabel}>4. Finalisation</ThemedText>
         {!authToken ? (
-            <ThemedView style={styles.signupContainer}>
-                <ThemedText style={styles.infoText}>Créez votre compte pour publier cette offre.</ThemedText>
-                <TextInput style={[styles.input, { borderColor: '#ccc', color: textColor }]} placeholder="Pseudo" value={signupPseudo} onChangeText={setSignupPseudo} />
-                <TextInput style={[styles.input, { borderColor: '#ccc', color: textColor }]} placeholder="Email" keyboardType="email-address" value={signupMail} onChangeText={setSignupMail} />
-                <TextInput style={[styles.input, { borderColor: '#ccc', color: textColor }]} placeholder="Mot de passe" secureTextEntry value={signupPassword} onChangeText={setSignupPassword} />
+            <ThemedView style={styles.authContainer}>
+                <ThemedText style={styles.infoText}>
+                  Entrez votre email et mot de passe pour continuer.{'\n'}
+                  <ThemedText style={styles.infoSubText}>
+                    Si vous n'avez pas de compte, il sera créé automatiquement.
+                  </ThemedText>
+                </ThemedText>
+                <TextInput 
+                  style={[styles.input, { borderColor: '#ccc', color: textColor }]} 
+                  placeholder="Email" 
+                  keyboardType="email-address" 
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  value={authMail} 
+                  onChangeText={setAuthMail} 
+                />
+                <TextInput 
+                  style={[styles.input, { borderColor: '#ccc', color: textColor }]} 
+                  placeholder="Mot de passe" 
+                  secureTextEntry 
+                  autoComplete="password"
+                  value={authPassword} 
+                  onChangeText={setAuthPassword} 
+                />
             </ThemedView>
         ) : (
-            <ThemedText style={styles.infoText}>Vous êtes connecté en tant que membre.</ThemedText>
+            <ThemedText style={styles.infoText}>✓ Vous êtes connecté</ThemedText>
         )}
 
-        <TouchableOpacity 
+        <Pressable 
             style={[styles.button, styles.validateButton, loadingAction && styles.buttonDisabled]}
-            onPress={handleProposeTravail}
+            onPress={() => {
+                console.log('=== BOUTON PROPOSE CLIQUÉ ===');
+                handleProposeTravail();
+            }}
             disabled={loadingAction}
         >
             {loadingAction ? <ActivityIndicator color="white" /> : <ThemedText style={styles.buttonText}>Valider et proposer ce travail</ThemedText>}
-        </TouchableOpacity>
+        </Pressable>
       </ThemedView>
     </ThemedView>
   );
@@ -512,11 +565,20 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontStyle: 'italic',
   },
-  signupContainer: {
-    gap: 10,
+  authContainer: {
+    gap: 12,
+    padding: 16,
+    backgroundColor: 'rgba(0, 122, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 122, 255, 0.1)',
   },
   infoText: {
     marginBottom: 10,
     fontStyle: 'italic',
+  },
+  infoSubText: {
+    fontSize: 12,
+    opacity: 0.7,
   },
 });

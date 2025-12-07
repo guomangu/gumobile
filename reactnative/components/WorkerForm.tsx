@@ -1,4 +1,4 @@
-import { StyleSheet, TextInput, Alert, TouchableOpacity, Platform, Button, ActivityIndicator } from 'react-native';
+import { StyleSheet, TextInput, Alert, TouchableOpacity, Pressable, Platform, Button, ActivityIndicator } from 'react-native';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -29,9 +29,8 @@ export function WorkerForm({ onUpdate }: WorkerFormProps) {
   
   // États pour les données locales (mode déconnecté / tunnel)
   const [localCompetences, setLocalCompetences] = useState<{nom: string, id?: number}[]>([]);
-  const [signupPseudo, setSignupPseudo] = useState('');
-  const [signupMail, setSignupMail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
+  const [authMail, setAuthMail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
   
   // États de chargement
   const [loading, setLoading] = useState(true);
@@ -178,11 +177,15 @@ export function WorkerForm({ onUpdate }: WorkerFormProps) {
   }, [loadAuthState, fetchAllCompetences, fetchAllGroupes]);
 
   useEffect(() => {
+    // Désactivation du chargement automatique des données existantes sur la home page
+    /*
     if (currentUserId && authToken) {
       fetchUserDemande();
     } else {
       setLoading(false);
     }
+    */
+    setLoading(false);
   }, [currentUserId, authToken, fetchUserDemande]);
 
   // Géolocalisation initiale
@@ -262,23 +265,30 @@ export function WorkerForm({ onUpdate }: WorkerFormProps) {
 
   // Logique principale de soumission (Tunnel)
   const handleGlobalSubmit = async () => {
+    console.log('[WorkerForm] handleGlobalSubmit appelée');
+    console.log('[WorkerForm] selectedAddress:', selectedAddress?.label);
+    console.log('[WorkerForm] demandeTexte:', demandeTexte);
+    console.log('[WorkerForm] authToken:', authToken ? 'présent' : 'absent');
+    
     if (!selectedAddress) {
-        Alert.alert('Erreur', 'Veuillez sélectionner une adresse');
+        const msg = 'Veuillez sélectionner une adresse';
+        Platform.OS === 'web' ? alert(msg) : Alert.alert('Erreur', msg);
         return;
     }
     const safeTexte = demandeTexte || '';
     if (!safeTexte.trim()) {
-        Alert.alert('Erreur', 'Veuillez décrire votre demande');
+        const msg = 'Veuillez décrire votre demande';
+        Platform.OS === 'web' ? alert(msg) : Alert.alert('Erreur', msg);
         return;
     }
     
-    // Validation Signup si non connecté
-    const safePseudo = signupPseudo || '';
-    const safeMail = signupMail || '';
-    const safePassword = signupPassword || '';
+    // Validation Auth si non connecté
+    const safeMail = authMail || '';
+    const safePassword = authPassword || '';
     
-    if (!authToken && (!safePseudo.trim() || !safeMail.trim() || !safePassword.trim())) {
-        Alert.alert('Erreur', 'Veuillez remplir les informations de création de compte');
+    if (!authToken && (!safeMail.trim() || !safePassword.trim())) {
+        const msg = 'Veuillez entrer votre email et mot de passe';
+        Platform.OS === 'web' ? alert(msg) : Alert.alert('Erreur', msg);
         return;
     }
 
@@ -287,71 +297,36 @@ export function WorkerForm({ onUpdate }: WorkerFormProps) {
     let finalUserId = currentUserId;
 
     try {
-        // 1. Inscription / Connexion (si nécessaire)
+        // 1. Auth (connexion ou création automatique via /api/auth)
         if (!finalAuthToken) {
-            // Création de compte
-            const signupResponse = await fetch(getApiUrl(API_ENDPOINTS.USERS), {
+            const authResponse = await fetch(getApiUrl('auth'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({
-                    pseudo: safePseudo.trim(),
-                    password: safePassword.trim(),
-                    mail: safeMail.trim(),
-                }),
+                body: JSON.stringify({ mail: safeMail.trim(), password: safePassword.trim() }),
             });
-
-            if (!signupResponse.ok) {
-                const err = await signupResponse.json();
-                throw new Error(err.message || 'Erreur lors de la création du compte');
-            }
-
-            const signupData = await signupResponse.json();
             
-            // Si l'API retourne un token directement (comme configuré dans signup.tsx)
-            if (signupData.token && signupData.user?.id) {
-                finalAuthToken = signupData.token;
-                finalUserId = signupData.user.id;
+            const authData = await authResponse.json();
+            
+            if (!authResponse.ok) {
+                throw new Error(authData.error || 'Erreur d\'authentification');
+            }
+            
+            if (authData.token && authData.user?.id) {
+                finalAuthToken = authData.token;
+                finalUserId = authData.user.id;
+                
                 await AsyncStorage.setItem('authToken', finalAuthToken!);
                 await AsyncStorage.setItem('userId', finalUserId!.toString());
-                await AsyncStorage.setItem('userPseudo', signupData.user.pseudo);
-                
-                // Mettre à jour l'état global
+                await AsyncStorage.setItem('userMail', authData.user.mail);
                 authEvents.emit(AUTH_EVENTS.LOGIN);
+                console.log('[WorkerForm] Authentification réussie, userId:', finalUserId);
             } else {
-                // Fallback: Tentative de login si le signup ne renvoie pas de token
-                console.log('Tentative de connexion automatique...');
-                const loginResponse = await fetch(getApiUrl('login'), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        pseudo: safePseudo.trim(),
-                        password: safePassword.trim(),
-                    }),
-                });
-
-                if (!loginResponse.ok) {
-                    throw new Error('Compte créé, mais échec de la connexion automatique. Veuillez vous connecter manuellement.');
-                }
-
-                const loginData = await loginResponse.json();
-                if (loginData.token && loginData.user?.id) {
-                    finalAuthToken = loginData.token;
-                    finalUserId = loginData.user.id;
-                    await AsyncStorage.setItem('authToken', finalAuthToken!);
-                    await AsyncStorage.setItem('userId', finalUserId!.toString());
-                    await AsyncStorage.setItem('userPseudo', loginData.user.pseudo);
-                    authEvents.emit(AUTH_EVENTS.LOGIN);
-                } else {
-                    throw new Error('Connexion réussie mais token manquant.');
-                }
+                throw new Error('Réponse d\'authentification invalide');
             }
         }
 
         // 2. Création de l'adresse (et Groupe)
-        const newAddress = await importAddress(selectedAddress.label);
+        const newAddress = await importAddress(selectedAddress.label, undefined, 'DEMANDE');
         const groupeId = newAddress.groupe?.id;
         
         // 3. Création de la demande
@@ -369,7 +344,10 @@ export function WorkerForm({ onUpdate }: WorkerFormProps) {
             }),
         });
 
-        if (!demandeResponse.ok) throw new Error('Erreur création demande');
+        if (!demandeResponse.ok) {
+            const errorText = await demandeResponse.text();
+            throw new Error(`Erreur création demande: ${demandeResponse.status} ${errorText}`);
+        }
         const newDemande = await demandeResponse.json();
         const demandeId = newDemande.id || parseInt(newDemande['@id']?.split('/').pop() || '0');
 
@@ -396,11 +374,11 @@ export function WorkerForm({ onUpdate }: WorkerFormProps) {
             });
         }
 
-        // Redirection vers la page de résultats
+        // Redirection vers la page du groupe nouvellement créé
         router.push({
-            pathname: '/(tabs)/travailler',
+            pathname: '/groupe/[id]',
             params: {
-                workerId: finalUserId
+                id: groupeId
             }
         });
         
@@ -623,35 +601,33 @@ export function WorkerForm({ onUpdate }: WorkerFormProps) {
         
         {!authToken ? (
             <ThemedView style={styles.signupContainer}>
-                <ThemedText style={styles.infoText}>Créez votre compte pour sauvegarder votre profil.</ThemedText>
-                <TextInput
-                    style={[styles.input, { borderColor, color: textColor }]}
-                    placeholder="Pseudo"
-                    value={signupPseudo}
-                    onChangeText={setSignupPseudo}
-                />
+                <ThemedText style={styles.infoText}>Connectez-vous ou créez un compte avec votre email.</ThemedText>
                 <TextInput
                     style={[styles.input, { borderColor, color: textColor }]}
                     placeholder="Email"
                     keyboardType="email-address"
-                    value={signupMail}
-                    onChangeText={setSignupMail}
+                    autoCapitalize="none"
+                    value={authMail}
+                    onChangeText={setAuthMail}
                 />
                 <TextInput
                     style={[styles.input, { borderColor, color: textColor }]}
                     placeholder="Mot de passe"
                     secureTextEntry
-                    value={signupPassword}
-                    onChangeText={setSignupPassword}
+                    value={authPassword}
+                    onChangeText={setAuthPassword}
                 />
             </ThemedView>
         ) : (
-            <ThemedText style={styles.infoText}>Vous êtes connecté en tant que membre.</ThemedText>
+            <ThemedText style={styles.infoText}>✓ Vous êtes connecté</ThemedText>
         )}
 
-        <TouchableOpacity 
+        <Pressable 
             style={[styles.button, styles.validateButton, loadingAction && styles.buttonDisabled]}
-            onPress={handleGlobalSubmit}
+            onPress={() => {
+                console.log('=== BOUTON WORKER CLIQUÉ ===');
+                handleGlobalSubmit();
+            }}
             disabled={loadingAction}
         >
             {loadingAction ? (
@@ -661,7 +637,7 @@ export function WorkerForm({ onUpdate }: WorkerFormProps) {
                     {authToken ? 'Voir les résultats' : 'Valider et voir les résultats'}
                 </ThemedText>
             )}
-        </TouchableOpacity>
+        </Pressable>
       </ThemedView>
 
     </ThemedView>

@@ -107,39 +107,13 @@ export default function HomeScreen() {
   }, []);
 
   const saveGroupeCree = useCallback(async (groupeId: number) => {
-    try {
-      console.log('[saveGroupeCree] Sauvegarde du groupe ID:', groupeId);
-      await AsyncStorage.setItem('groupeCreeId', groupeId.toString());
-      console.log('[saveGroupeCree] Groupe sauvegardé avec succès');
-    } catch (error) {
-      console.error('[saveGroupeCree] Erreur:', error);
-    }
+    // Fonctionnalité de stockage désactivée sur demande
+    console.log('[saveGroupeCree] Stockage désactivé');
   }, []);
 
   const loadGroupeCree = useCallback(async () => {
-    try {
-      console.log('[loadGroupeCree] Chargement du groupe depuis AsyncStorage');
-      const groupeIdStr = await AsyncStorage.getItem('groupeCreeId');
-      console.log('[loadGroupeCree] ID trouvé:', groupeIdStr);
-      if (groupeIdStr) {
-        const groupeId = parseInt(groupeIdStr, 10);
-        if (!isNaN(groupeId)) {
-          const groupe = await fetchGroupeComplet(groupeId);
-          if (groupe) {
-            console.log('[loadGroupeCree] Groupe chargé:', groupe);
-            setGroupeCree(groupe);
-          } else {
-            console.warn('[loadGroupeCree] Impossible de charger le groupe complet');
-          }
-        } else {
-          console.error('[loadGroupeCree] ID invalide:', groupeIdStr);
-        }
-      } else {
-        console.log('[loadGroupeCree] Aucun groupe sauvegardé');
-      }
-    } catch (error) {
-      console.error('[loadGroupeCree] Erreur:', error);
-    }
+    // Fonctionnalité de stockage désactivée sur demande
+    console.log('[loadGroupeCree] Chargement désactivé');
   }, [fetchGroupeComplet]);
 
   const loadAuthToken = useCallback(async () => {

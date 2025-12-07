@@ -40,6 +40,7 @@ class AdresseController extends AbstractController
 
         $query = $data['query'];
         $complement = $data['complement'] ?? null;
+        $type = $data['type'] ?? null;
 
         try {
             // Recherche de l'adresse via l'API BAN
@@ -66,6 +67,9 @@ class AdresseController extends AbstractController
             // Création automatique d'un groupe
             $groupe = new Groupe();
             $groupe->setNom('Groupe de ' . ($properties['label'] ?? $query));
+            if ($type) {
+                $groupe->setType($type);
+            }
             $this->entityManager->persist($groupe);
 
             // Extraction des composants de l'adresse
@@ -154,6 +158,7 @@ class AdresseController extends AbstractController
             return new JsonResponse([
                 'id' => $groupe->getId(),
                 'nom' => $groupe->getNom(),
+                'type' => $groupe->getType(),
                 'adresses' => array_map(function (Adresse $tag) {
                     return [
                         'id' => $tag->getId(),

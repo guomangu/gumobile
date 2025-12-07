@@ -170,7 +170,7 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
 /**
  * Importe une adresse depuis l'API BAN vers notre système
  */
-export async function importAddress(query: string, complement?: string): Promise<Adresse> {
+export async function importAddress(query: string, complement?: string, type?: string): Promise<Adresse> {
   try {
     const url = getApiUrl('adresses/import');
     const response = await fetch(url, {
@@ -182,6 +182,7 @@ export async function importAddress(query: string, complement?: string): Promise
       body: JSON.stringify({
         query,
         complement,
+        type,
       }),
     });
     

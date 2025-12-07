@@ -39,7 +39,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'groupe:read'])]
     private ?int $id = null;
 
-    #[ORM\Column(length: 180, unique: true)]
+    #[ORM\Column(length: 180, nullable: true)]
     #[Groups(['user:read', 'user:write'])]
     private ?string $pseudo = null;
 
@@ -126,9 +126,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getGroupesData(): array
     {
         return $this->groupes->map(function ($groupe) {
+            $adresse = $groupe->getAdresses()->first();
+            $demande = $groupe->getDemandes()->first();
+            
             return [
                 'id' => $groupe->getId(),
                 'nom' => $groupe->getNom(),
+                'type' => $groupe->getType(),
+                'adresse' => $adresse ? $adresse->getValeur() : null,
+                'description' => $demande ? $demande->getTexte() : null,
             ];
         })->toArray();
     }
@@ -158,7 +164,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     public function getUserIdentifier(): string
     {
-        return (string) $this->pseudo;
+        return (string) $this->mail;
     }
 
     /**
