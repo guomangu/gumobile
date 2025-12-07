@@ -323,7 +323,10 @@ export default function HomeScreen() {
 
 
         <ThemedView style={styles.groupeContainer} cloudStyle={false}>
-          <CreateAddressForm onAddressCreated={handleAddressCreated} />
+          <CreateAddressForm 
+            key={authToken ?? 'guest'} 
+            onAddressCreated={handleAddressCreated} 
+          />
         </ThemedView>
 
     </ParallaxScrollView>

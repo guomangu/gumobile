@@ -1,5 +1,6 @@
 import { StyleSheet, TextInput, Alert, TouchableOpacity, Platform, Button, ActivityIndicator } from 'react-native';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -16,6 +17,7 @@ interface WorkerFormProps {
 }
 
 export function WorkerForm({ onUpdate }: WorkerFormProps) {
+  const router = useRouter();
   // États du formulaire de demande
   const [demandeTexte, setDemandeTexte] = useState('');
   const [competenceNom, setCompetenceNom] = useState('');
@@ -394,7 +396,13 @@ export function WorkerForm({ onUpdate }: WorkerFormProps) {
             });
         }
 
-        Alert.alert('Félicitations !', 'Votre compte, votre présentation et vos compétences ont été créés avec succès !');
+        // Redirection vers la page de résultats
+        router.push({
+            pathname: '/(tabs)/travailler',
+            params: {
+                workerId: finalUserId
+            }
+        });
         
         // Rafraichir
         setAuthToken(finalAuthToken);
@@ -650,7 +658,7 @@ export function WorkerForm({ onUpdate }: WorkerFormProps) {
                 <ActivityIndicator color="white" />
             ) : (
                 <ThemedText style={styles.buttonText}>
-                    {authToken ? 'Mettre à jour ma présentation' : 'Valider et créer mon compte'}
+                    {authToken ? 'Voir les résultats' : 'Valider et voir les résultats'}
                 </ThemedText>
             )}
         </TouchableOpacity>
