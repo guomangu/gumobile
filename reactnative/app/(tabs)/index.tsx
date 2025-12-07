@@ -318,9 +318,9 @@ export default function HomeScreen() {
           style={styles.reactLogo}
         />
       }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedView style={styles.headerRow}>
-          <ThemedView style={styles.titleSection}>
+      <ThemedView style={styles.titleContainer} cloudStyle={false}>
+        <ThemedView style={styles.headerRow} cloudStyle={false}>
+          <ThemedView style={styles.titleSection} cloudStyle={false}>
             <ThemedText type="title">Welcome!</ThemedText>
             <HelloWave />
           </ThemedView>
@@ -329,7 +329,7 @@ export default function HomeScreen() {
 
       
       {groupeCree && (
-        <ThemedView style={styles.groupeContainer}>
+        <ThemedView style={styles.groupeContainer} cloudStyle={false}>
           <ThemedText type="subtitle">Groupe créé</ThemedText>
           <GroupeItem
             groupe={groupeCree}
@@ -349,7 +349,7 @@ export default function HomeScreen() {
         </ThemedView>
       )}
 
-        <ThemedView style={styles.groupeContainer}>
+        <ThemedView style={styles.groupeContainer} cloudStyle={false}>
           <CreateAddressForm onAddressCreated={handleAddressCreated} />
         </ThemedView>
 
@@ -391,8 +391,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   groupeContainer: {
-    marginTop: 16,
-    padding: 16,
-    gap: 12,
+    marginTop: 20,
+    padding: 0,
+    gap: 0,
   },
 });

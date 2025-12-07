@@ -22,7 +22,7 @@ export function AddressAutocomplete({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const backgroundColor = useThemeColor({}, 'background');
+  const backgroundColor = '#ffffff';
   const textColor = useThemeColor({}, 'text');
   const borderColor = useThemeColor({}, 'icon');
 
@@ -100,7 +100,7 @@ export function AddressAutocomplete({
             },
           ]}
           placeholder={placeholder}
-          placeholderTextColor={borderColor}
+          placeholderTextColor={textColor + '80'}
           value={query}
           onChangeText={setQuery}
           onFocus={() => {
@@ -169,12 +169,13 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   input: {
-    borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 12,
     fontSize: 16,
     minHeight: 44,
     paddingRight: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    margin: 5,
   },
   loader: {
     position: 'absolute',
@@ -187,23 +188,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     marginTop: 4,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 16,
     maxHeight: 200,
     zIndex: 1000,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
   },
   suggestionsList: {
     maxHeight: 200,
   },
   suggestionItem: {
     padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
   },
   suggestionLabel: {
     marginBottom: 4,

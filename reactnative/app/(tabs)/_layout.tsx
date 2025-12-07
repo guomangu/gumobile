@@ -53,6 +53,10 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: true,
+        headerStyle: {
+          backgroundColor: '#B0E0E6', // Fond bleu pastel pour le header
+        },
+        headerTintColor: '#000000', // Texte noir dans le header
         headerRight: () => (
           <View style={styles.headerRight}>
             <MenuBurger

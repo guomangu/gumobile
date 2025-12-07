@@ -130,7 +130,7 @@ export default function GroupeScreen() {
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}>
-      <ThemedView style={styles.container}>
+      <ThemedView style={styles.container} cloudStyle={false}>
         <GroupeList
           groupes={groupes}
           loading={loadingGroupes}

@@ -67,14 +67,16 @@ export function GroupeItem({
 
 const styles = StyleSheet.create({
   groupeItem: {
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
+    padding: 20,
+    marginBottom: 16,
+    borderRadius: 20,
+    gap: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   groupeHeader: {
-    gap: 4,
+    gap: 6,
+    marginBottom: 4,
+    paddingBottom: 12,
   },
   groupeId: {
     fontSize: 12,

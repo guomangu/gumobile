@@ -82,17 +82,18 @@ export function CreateAddressForm({ onAddressCreated }: CreateAddressFormProps) 
 
 const styles = StyleSheet.create({
   formContainer: {
-    gap: 12,
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: 8,
+    gap: 16,
+    marginBottom: 20,
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   selectedAddressContainer: {
     marginTop: 12,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
+    padding: 16,
+    borderRadius: 16,
     gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
   },
   selectedAddressLabel: {
     marginBottom: 4,

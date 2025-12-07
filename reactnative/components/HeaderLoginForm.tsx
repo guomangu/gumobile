@@ -133,13 +133,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   input: {
-    borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
     fontSize: 11,
     minHeight: 28,
     width: 90,
+    margin: 5,
   },
   loginButton: {
     paddingHorizontal: 10,
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   },
   signupButtonText: {
     fontSize: 10,
-    color: '#007AFF',
+    color: '#000000', // Noir
     textDecorationLine: 'underline',
   },
 });

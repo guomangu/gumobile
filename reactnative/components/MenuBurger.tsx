@@ -107,7 +107,7 @@ export function MenuBurger({ authToken, userPseudo, onLogout, onLoginSuccess }: 
         onPress={() => setIsMenuOpen(true)}
         activeOpacity={0.7}
       >
-        <MaterialIcons name="menu" size={28} color={textColor} />
+        <MaterialIcons name="menu" size={28} color="#000000" />
       </TouchableOpacity>
 
       <Modal
@@ -133,7 +133,7 @@ export function MenuBurger({ authToken, userPseudo, onLogout, onLoginSuccess }: 
                 onPress={() => setIsMenuOpen(false)}
                 style={styles.closeButton}
               >
-                <MaterialIcons name="close" size={24} color={textColor} />
+                <MaterialIcons name="close" size={24} color="#000000" />
               </TouchableOpacity>
             </ThemedView>
 
@@ -191,7 +191,7 @@ export function MenuBurger({ authToken, userPseudo, onLogout, onLoginSuccess }: 
                   style={[styles.signupButton, { borderColor }]}
                   onPress={handleSignup}
                 >
-                  <MaterialIcons name="person-add" size={20} color={textColor} />
+                  <MaterialIcons name="person-add" size={20} color="#000000" />
                   <ThemedText style={styles.signupButtonText}>
                     Créer un compte
                   </ThemedText>
@@ -207,9 +207,12 @@ export function MenuBurger({ authToken, userPseudo, onLogout, onLoginSuccess }: 
 
 const styles = StyleSheet.create({
   burgerButton: {
-    padding: 8,
+    padding: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    minWidth: 44,
+    minHeight: 44,
+    zIndex: 1000,
   },
   modalOverlay: {
     flex: 1,
@@ -222,18 +225,11 @@ const styles = StyleSheet.create({
   menuContainer: {
     minWidth: 280,
     maxWidth: 320,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 16,
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    borderRadius: 20,
+    padding: 20,
+    gap: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    zIndex: 1001,
   },
   menuHeader: {
     flexDirection: 'row',
@@ -241,8 +237,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
     paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
   menuTitle: {
     fontSize: 18,
@@ -264,14 +258,13 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 12,
     borderRadius: 8,
-    borderWidth: 1,
     marginVertical: 4,
   },
   menuItemText: {
     fontSize: 16,
   },
   loginForm: {
-    gap: 12,
+    gap: 16,
     width: '100%',
   },
   formTitle: {
@@ -280,19 +273,21 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 14,
     fontSize: 14,
-    minHeight: 44,
+    minHeight: 48,
     width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 1)',
+    margin: 5,
   },
   loginButton: {
-    padding: 12,
-    borderRadius: 8,
+    padding: 14,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 44,
+    minHeight: 48,
+    marginTop: 4,
   },
   loginButtonText: {
     color: '#FFFFFF',
@@ -303,15 +298,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
+    padding: 14,
+    borderRadius: 12,
     justifyContent: 'center',
-    marginTop: 4,
+    marginTop: 8,
+    minHeight: 48,
   },
   signupButtonText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: '#000000', // Noir
   },
 });
 

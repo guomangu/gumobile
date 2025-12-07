@@ -75,10 +75,10 @@ export default function SignupScreen() {
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}>
-      <ThemedView style={styles.container}>
+      <ThemedView style={styles.container} cloudStyle={false}>
         <ThemedText type="title" style={styles.title}>Créer un compte</ThemedText>
         
-        <ThemedView style={styles.formContainer}>
+        <ThemedView style={styles.formContainer} cloudStyle={false}>
           <ThemedText style={styles.label}>Pseudo</ThemedText>
           <TextInput
             style={[styles.input, { borderColor, color: textColor }]}
@@ -129,14 +129,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    gap: 20,
+    gap: 24,
   },
   title: {
     marginBottom: 20,
     textAlign: 'center',
   },
   formContainer: {
-    gap: 16,
+    gap: 20,
+    padding: 24,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   label: {
     fontSize: 14,
@@ -144,11 +147,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 14,
     fontSize: 16,
-    minHeight: 44,
+    minHeight: 48,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    margin: 5,
   },
 });
 

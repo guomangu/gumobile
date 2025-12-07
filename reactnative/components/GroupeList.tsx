@@ -43,7 +43,7 @@ export function GroupeList({
   }
 
   return (
-    <ThemedView style={styles.listContainer}>
+    <ThemedView style={styles.listContainer} cloudStyle={false}>
       <ThemedText type="subtitle">Liste des groupes</ThemedText>
       <FlatList
         data={groupes}
@@ -73,9 +73,9 @@ export function GroupeList({
 
 const styles = StyleSheet.create({
   listContainer: {
-    gap: 12,
-    marginBottom: 16,
-    padding: 16,
+    gap: 16,
+    marginBottom: 20,
+    padding: 0,
   },
   emptyText: {
     fontStyle: 'italic',
