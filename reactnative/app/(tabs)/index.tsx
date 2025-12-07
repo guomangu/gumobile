@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { StyleSheet, Button, Alert } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
 
@@ -25,6 +25,8 @@ export default function HomeScreen() {
   const [allCompetences, setAllCompetences] = useState<CompetenceApi[]>([]);
   const [addedCompetenceIds, setAddedCompetenceIds] = useState<Set<number>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  // État pour stocker tous les groupes (pour améliorer l'autocomplétion)
+  const [allGroupes, setAllGroupes] = useState<Groupe[]>([]);
 
   // Définir fetchGroupeComplet avant les autres fonctions qui l'utilisent
   const fetchGroupeComplet = useCallback(async (groupeId: number): Promise<Groupe | null> => {
@@ -140,6 +142,7 @@ export default function HomeScreen() {
     loadAuthToken();
     loadUserId();
     fetchAllCompetences();
+    fetchAllGroupes();
     loadGroupeCree();
   }, [loadGroupeCree]);
 
@@ -193,6 +196,28 @@ export default function HomeScreen() {
     }
   };
 
+  const fetchAllGroupes = async () => {
+    try {
+      const response = await fetch(getApiUrl(API_ENDPOINTS.GROUPES), {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const groupesList = data['hydra:member'] || data || [];
+      setAllGroupes(Array.isArray(groupesList) ? groupesList : []);
+    } catch (error: any) {
+      console.error('Erreur lors de la récupération des groupes:', error);
+      setAllGroupes([]);
+    }
+  };
+
 
   const handleUpdateGroupe = useCallback(async () => {
     if (groupeCree) {
@@ -202,6 +227,7 @@ export default function HomeScreen() {
       }
     }
     fetchAllCompetences();
+    fetchAllGroupes();
   }, [groupeCree, fetchGroupeComplet]);
 
   const handleLogout = async () => {
@@ -238,8 +264,21 @@ export default function HomeScreen() {
           demandes: [],
         });
       }
+      // Rafraîchir la liste de tous les groupes pour améliorer l'autocomplétion
+      fetchAllGroupes();
     }
   }, [saveGroupeCree, fetchGroupeComplet]);
+
+  // Combiner tous les groupes avec le groupe créé pour améliorer l'autocomplétion
+  const combinedGroupes = useMemo(() => {
+    if (!groupeCree) return allGroupes;
+    const groupesMap = new Map(allGroupes.map(g => [g.id, g]));
+    // S'assurer que le groupe créé est inclus
+    if (!groupesMap.has(groupeCree.id)) {
+      return [...allGroupes, groupeCree];
+    }
+    return allGroupes;
+  }, [allGroupes, groupeCree]);
 
   return (
     <ParallaxScrollView
@@ -281,7 +320,7 @@ export default function HomeScreen() {
             authToken={authToken}
             currentUserId={currentUserId}
             allCompetences={allCompetences}
-            groupes={[groupeCree]}
+            groupes={combinedGroupes}
             addedCompetenceIds={addedCompetenceIds}
             onUpdate={handleUpdateGroupe}
             onAllCompetencesUpdate={fetchAllCompetences}
