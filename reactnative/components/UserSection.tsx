@@ -13,9 +13,10 @@ interface UserSectionProps {
   authToken: string | null;
   currentUserId: number | null;
   onUpdate: () => void;
+  onLoginSuccess?: () => void;
 }
 
-export function UserSection({ groupeId, users, authToken, currentUserId, onUpdate }: UserSectionProps) {
+export function UserSection({ groupeId, users, authToken, currentUserId, onUpdate, onLoginSuccess }: UserSectionProps) {
   const [userPseudo, setUserPseudo] = useState('');
   const [userPassword, setUserPassword] = useState('');
   const [userMail, setUserMail] = useState('');
@@ -56,11 +57,18 @@ export function UserSection({ groupeId, users, authToken, currentUserId, onUpdat
 
       const responseData = await response.json();
       
+      // Si un token est retourné, connecter automatiquement l'utilisateur
       if (responseData.token && responseData.user) {
         await AsyncStorage.setItem('authToken', responseData.token);
         await AsyncStorage.setItem('userId', responseData.user.id.toString());
         await AsyncStorage.setItem('userPseudo', responseData.user.pseudo);
-        Alert.alert('Succès', 'Utilisateur créé et connecté automatiquement !');
+        
+        // Rafraîchir l'état d'authentification dans les composants parents
+        if (onLoginSuccess) {
+          onLoginSuccess();
+        }
+        
+        Alert.alert('Succès', `Utilisateur créé et connecté automatiquement ! Bienvenue ${responseData.user.pseudo} !`);
       } else {
         Alert.alert('Succès', 'Utilisateur créé et lié au groupe avec succès !');
       }
@@ -168,6 +176,11 @@ export function UserSection({ groupeId, users, authToken, currentUserId, onUpdat
       {authToken && currentUserId ? (
         <>
           <ThemedText style={styles.createUserLabel}>Vous êtes connecté</ThemedText>
+          {!isCurrentUserInGroupe && (
+            <ThemedText style={styles.infoMessage}>
+              💡 Participez au groupe pour pouvoir modifier les demandes et compétences
+            </ThemedText>
+          )}
           <Button
             title={loadingUser ? 'Participation...' : 'Participer au groupe'}
             onPress={handleJoinGroupe}
@@ -176,7 +189,16 @@ export function UserSection({ groupeId, users, authToken, currentUserId, onUpdat
         </>
       ) : (
         <>
-          <ThemedText style={styles.createUserLabel}>Créer un utilisateur pour ce groupe:</ThemedText>
+          <ThemedText style={styles.createUserLabel}>
+            {hasUsers 
+              ? 'Créer un utilisateur pour ce groupe:' 
+              : 'Créer un utilisateur pour ce groupe (après avoir créé des demandes et tags):'}
+          </ThemedText>
+          {!hasUsers && (
+            <ThemedText style={styles.infoMessage}>
+              💡 Vous pouvez d'abord créer des demandes et ajouter des tags ci-dessus, puis créer un utilisateur ici
+            </ThemedText>
+          )}
           <TextInput
             style={[styles.userInput, { borderColor, color: textColor }]}
             placeholder="Pseudo..."
@@ -267,6 +289,15 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  infoMessage: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    opacity: 0.8,
+    padding: 8,
+    backgroundColor: 'rgba(0,122,255,0.1)',
+    borderRadius: 6,
+    marginBottom: 8,
   },
 });
 

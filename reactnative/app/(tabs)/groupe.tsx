@@ -1,6 +1,8 @@
 import { StyleSheet } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
+import { authEvents, AUTH_EVENTS } from '@/utils/authEvents';
 
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedView } from '@/components/themed-view';
@@ -50,33 +52,24 @@ export default function GroupeScreen() {
     }
   };
 
-  useEffect(() => {
-    fetchGroupes();
-    fetchAllCompetences();
-    loadAuthToken();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = () => {
-      loadAuthToken();
-    };
-    return unsubscribe;
-  }, []);
-
-  const loadAuthToken = async () => {
+  const loadAuthToken = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('authToken');
       const userId = await AsyncStorage.getItem('userId');
       if (token) {
         setAuthToken(token);
+      } else {
+        setAuthToken(null);
       }
       if (userId) {
         setCurrentUserId(parseInt(userId, 10));
+      } else {
+        setCurrentUserId(null);
       }
     } catch (error) {
       console.error('Erreur lors du chargement du token:', error);
     }
-  };
+  }, []);
 
   const fetchAllCompetences = async () => {
     setLoadingAllCompetences(true);
@@ -90,6 +83,36 @@ export default function GroupeScreen() {
       setLoadingAllCompetences(false);
     }
   };
+
+  useEffect(() => {
+    fetchGroupes();
+    fetchAllCompetences();
+    loadAuthToken();
+  }, [loadAuthToken]);
+
+  // Écouter les événements d'authentification pour rafraîchir automatiquement
+  useEffect(() => {
+    const handleAuthChange = () => {
+      loadAuthToken();
+      fetchGroupes();
+    };
+
+    authEvents.on(AUTH_EVENTS.LOGIN, handleAuthChange);
+    authEvents.on(AUTH_EVENTS.LOGOUT, handleAuthChange);
+
+    return () => {
+      authEvents.off(AUTH_EVENTS.LOGIN, handleAuthChange);
+      authEvents.off(AUTH_EVENTS.LOGOUT, handleAuthChange);
+    };
+  }, [loadAuthToken]);
+
+  // Rafraîchir l'état d'authentification quand on revient sur la page
+  useFocusEffect(
+    useCallback(() => {
+      loadAuthToken();
+      fetchGroupes();
+    }, [loadAuthToken])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -120,6 +143,7 @@ export default function GroupeScreen() {
           onUpdate={handleUpdate}
           onAllCompetencesUpdate={handleAllCompetencesUpdate}
           onAddedCompetenceIdsUpdate={setAddedCompetenceIds}
+          onLoginSuccess={loadAuthToken}
         />
       </ThemedView>
     </ParallaxScrollView>

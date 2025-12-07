@@ -15,6 +15,8 @@ interface CompetenceSectionProps {
   groupes: any[];
   addedCompetenceIds: Set<number>;
   demandeGroupeId: number;
+  currentUserId: number | null;
+  groupeUsers: any[];
   onUpdate: () => void;
   onAllCompetencesUpdate: () => void;
   onAddedCompetenceIdsUpdate: (ids: Set<number>) => void;
@@ -28,6 +30,8 @@ export function CompetenceSection({
   groupes,
   addedCompetenceIds,
   demandeGroupeId,
+  currentUserId,
+  groupeUsers,
   onUpdate,
   onAllCompetencesUpdate,
   onAddedCompetenceIdsUpdate,
@@ -39,8 +43,19 @@ export function CompetenceSection({
   
   const textColor = useThemeColor({}, 'text');
   const borderColor = useThemeColor({}, 'icon');
+  
+  // Vérifier si l'utilisateur actuel est membre du groupe
+  const isUserInGroupe = currentUserId && groupeUsers.some(user => user.id === currentUserId);
+  // Permettre la modification si le groupe n'a pas d'utilisateurs (groupe vide)
+  const canModifyGroupe = groupeUsers.length === 0 || isUserInGroupe;
 
   const handleCreateCompetence = async (nomCompetence?: string, competenceId?: number) => {
+    // Vérifier si l'utilisateur est membre du groupe ou si le groupe est vide
+    if (!canModifyGroupe) {
+      Alert.alert('Erreur', 'Vous devez être membre du groupe pour créer des compétences');
+      return;
+    }
+
     const nom = nomCompetence || competenceNom.trim();
     if (!nom) {
       Alert.alert('Erreur', 'Veuillez entrer un nom pour la compétence');
@@ -155,8 +170,8 @@ export function CompetenceSection({
         </ThemedView>
       )}
       
-      {/* Propositions de compétences existantes de la DB */}
-      {proposedCompetences.length > 0 && (
+      {/* Propositions de compétences existantes de la DB - seulement si peut modifier */}
+      {canModifyGroupe && proposedCompetences.length > 0 && (
         <ThemedView style={styles.proposedCompetencesContainer}>
           <ThemedText style={styles.proposedCompetencesLabel}>
             Suggestions de compétences (existantes):
@@ -178,8 +193,8 @@ export function CompetenceSection({
         </ThemedView>
       )}
 
-      {/* Propositions de nouveaux mots de la demande */}
-      {proposedNewWords.length > 0 && (
+      {/* Propositions de nouveaux mots de la demande - seulement si peut modifier */}
+      {canModifyGroupe && proposedNewWords.length > 0 && (
         <ThemedView style={styles.proposedNewWordsContainer}>
           <ThemedText style={styles.proposedNewWordsLabel}>
             Mots de la demande (nouveaux tags):
@@ -204,22 +219,35 @@ export function CompetenceSection({
         </ThemedView>
       )}
       
-      {/* Input pour créer une nouvelle compétence */}
-      <ThemedView style={styles.createCompetenceContainer}>
-        <ThemedText style={styles.createCompetenceLabel}>Ajouter une compétence (tag):</ThemedText>
-        <TextInput
-          style={[styles.competenceInput, { borderColor, color: textColor }]}
-          placeholder="Entrez un mot-clé..."
-          placeholderTextColor={textColor + '80'}
-          value={competenceNom}
-          onChangeText={setCompetenceNom}
-        />
-        <Button
-          title={loadingCompetence ? 'Création...' : 'Ajouter'}
-          onPress={() => handleCreateCompetence()}
-          disabled={loadingCompetence || !competenceNom.trim()}
-        />
-      </ThemedView>
+      {/* Input pour créer une nouvelle compétence - seulement si peut modifier */}
+      {canModifyGroupe ? (
+        <ThemedView style={styles.createCompetenceContainer}>
+          <ThemedText style={styles.createCompetenceLabel}>Ajouter une compétence (tag):</ThemedText>
+          {groupeUsers.length === 0 && (
+            <ThemedText style={styles.infoMessage}>
+              💡 Vous pouvez ajouter des tags maintenant. Vous pourrez vous connecter ou créer un utilisateur après.
+            </ThemedText>
+          )}
+          <TextInput
+            style={[styles.competenceInput, { borderColor, color: textColor }]}
+            placeholder="Entrez un mot-clé..."
+            placeholderTextColor={textColor + '80'}
+            value={competenceNom}
+            onChangeText={setCompetenceNom}
+          />
+          <Button
+            title={loadingCompetence ? 'Création...' : 'Ajouter'}
+            onPress={() => handleCreateCompetence()}
+            disabled={loadingCompetence || !competenceNom.trim()}
+          />
+        </ThemedView>
+      ) : (
+        <ThemedView style={styles.createCompetenceContainer}>
+          <ThemedText style={styles.restrictedMessage}>
+            Vous devez être membre du groupe pour ajouter des compétences
+          </ThemedText>
+        </ThemedView>
+      )}
     </>
   );
 }
@@ -332,6 +360,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: 'rgba(255,149,0,0.9)',
+  },
+  restrictedMessage: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    opacity: 0.7,
+    textAlign: 'center',
+    padding: 8,
+  },
+  infoMessage: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    opacity: 0.8,
+    padding: 8,
+    backgroundColor: 'rgba(0,122,255,0.1)',
+    borderRadius: 6,
+    marginBottom: 8,
   },
 });
 

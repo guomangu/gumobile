@@ -17,6 +17,7 @@ interface GroupeListProps {
   onUpdate: () => void;
   onAllCompetencesUpdate: () => void;
   onAddedCompetenceIdsUpdate: (ids: Set<number>) => void;
+  onLoginSuccess?: () => void;
 }
 
 export function GroupeList({
@@ -31,6 +32,7 @@ export function GroupeList({
   onUpdate,
   onAllCompetencesUpdate,
   onAddedCompetenceIdsUpdate,
+  onLoginSuccess,
 }: GroupeListProps) {
   if (loading && groupes.length === 0) {
     return <ThemedText>Chargement...</ThemedText>;
@@ -56,6 +58,7 @@ export function GroupeList({
             onUpdate={onUpdate}
             onAllCompetencesUpdate={onAllCompetencesUpdate}
             onAddedCompetenceIdsUpdate={onAddedCompetenceIdsUpdate}
+            onLoginSuccess={onLoginSuccess}
           />
         )}
         keyExtractor={(item) => item.id.toString()}

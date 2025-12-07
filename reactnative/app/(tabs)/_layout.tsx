@@ -1,13 +1,14 @@
 import { Tabs, useFocusEffect } from 'expo-router';
 import React, { useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, StyleSheet, Button, Alert } from 'react-native';
+import { View, StyleSheet, Alert } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from '@/components/themed-text';
+import { MenuBurger } from '@/components/MenuBurger';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -32,6 +33,7 @@ export default function TabLayout() {
       await AsyncStorage.removeItem('userPseudo');
       setAuthToken(null);
       setUserPseudo(null);
+      // L'événement LOGOUT est déjà émis par MenuBurger
       Alert.alert('Déconnexion', 'Vous avez été déconnecté avec succès');
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', error);
@@ -53,22 +55,12 @@ export default function TabLayout() {
         headerShown: true,
         headerRight: () => (
           <View style={styles.headerRight}>
-            {authToken && userPseudo ? (
-              <View style={styles.authHeader}>
-                <ThemedText style={styles.headerText}>
-                  👤 {userPseudo}
-                </ThemedText>
-                <Button
-                  title="Déconnexion"
-                  onPress={handleLogout}
-                  color="#ff3b30"
-                />
-              </View>
-            ) : (
-              <ThemedText style={styles.headerText}>
-                Non connecté
-              </ThemedText>
-            )}
+            <MenuBurger
+              authToken={authToken}
+              userPseudo={userPseudo}
+              onLogout={handleLogout}
+              onLoginSuccess={loadAuthState}
+            />
           </View>
         ),
         tabBarButton: HapticTab,
@@ -101,6 +93,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="signup"
+        options={{
+          title: 'Créer un compte',
+          href: null, // Masquer de la barre de navigation
+        }}
+      />
     </Tabs>
   );
 }
@@ -111,14 +110,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  authHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerText: {
-    fontSize: 14,
-    fontWeight: '500',
   },
 });

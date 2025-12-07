@@ -1,14 +1,16 @@
 import { Image } from 'expo-image';
-import { StyleSheet, Button, Alert } from 'react-native';
+import { StyleSheet, Alert } from 'react-native';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { authEvents, AUTH_EVENTS } from '@/utils/authEvents';
 
 import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { CreateAddressForm } from '@/components/CreateAddressForm';
+import { MenuBurger } from '@/components/MenuBurger';
 import { getApiUrl, API_ENDPOINTS, getCompetences, type Competence as CompetenceApi } from '@/constants/api';
 import { type Groupe } from '@/components/types';
 import { GroupeItem } from '@/components/GroupeItem';
@@ -138,55 +140,39 @@ export default function HomeScreen() {
     }
   }, [fetchGroupeComplet]);
 
-  useEffect(() => {
-    loadAuthToken();
-    loadUserId();
-    fetchAllCompetences();
-    fetchAllGroupes();
-    loadGroupeCree();
-  }, [loadGroupeCree]);
-
-  useEffect(() => {
-    const unsubscribe = () => {
-      loadAuthToken();
-    };
-    return unsubscribe;
-  }, []);
-
-  // Rafraîchir le groupe quand on revient sur la page
-  useFocusEffect(
-    useCallback(() => {
-      loadGroupeCree();
-    }, [loadGroupeCree])
-  );
-
-  const loadAuthToken = async () => {
+  const loadAuthToken = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('authToken');
       const userPseudo = await AsyncStorage.getItem('userPseudo');
       if (token) {
         setAuthToken(token);
+      } else {
+        setAuthToken(null);
       }
       if (userPseudo) {
         setCurrentUserPseudo(userPseudo);
+      } else {
+        setCurrentUserPseudo(null);
       }
     } catch (error) {
       console.error('Erreur lors du chargement du token:', error);
     }
-  };
+  }, []);
 
-  const loadUserId = async () => {
+  const loadUserId = useCallback(async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
       if (userId) {
         setCurrentUserId(parseInt(userId, 10));
+      } else {
+        setCurrentUserId(null);
       }
     } catch (error) {
       console.error('Erreur lors du chargement de l\'ID utilisateur:', error);
     }
-  };
+  }, []);
 
-  const fetchAllCompetences = async () => {
+  const fetchAllCompetences = useCallback(async () => {
     try {
       const data = await getCompetences();
       setAllCompetences(Array.isArray(data) ? data : []);
@@ -194,9 +180,9 @@ export default function HomeScreen() {
       console.error('Erreur lors de la récupération des compétences:', error);
       setAllCompetences([]);
     }
-  };
+  }, []);
 
-  const fetchAllGroupes = async () => {
+  const fetchAllGroupes = useCallback(async () => {
     try {
       const response = await fetch(getApiUrl(API_ENDPOINTS.GROUPES), {
         method: 'GET',
@@ -216,7 +202,49 @@ export default function HomeScreen() {
       console.error('Erreur lors de la récupération des groupes:', error);
       setAllGroupes([]);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadAuthToken();
+    loadUserId();
+    fetchAllCompetences();
+    fetchAllGroupes();
+    loadGroupeCree();
+  }, [loadGroupeCree, loadAuthToken, loadUserId, fetchAllCompetences, fetchAllGroupes]);
+
+  // Écouter les événements d'authentification pour rafraîchir automatiquement
+  useEffect(() => {
+    const handleAuthChange = async () => {
+      await loadAuthToken();
+      await loadUserId();
+      // Rafraîchir les groupes et le groupe créé si nécessaire
+      await fetchAllGroupes();
+      if (groupeCree) {
+        const groupe = await fetchGroupeComplet(groupeCree.id);
+        if (groupe) {
+          setGroupeCree(groupe);
+        }
+      }
+    };
+
+    authEvents.on(AUTH_EVENTS.LOGIN, handleAuthChange);
+    authEvents.on(AUTH_EVENTS.LOGOUT, handleAuthChange);
+
+    return () => {
+      authEvents.off(AUTH_EVENTS.LOGIN, handleAuthChange);
+      authEvents.off(AUTH_EVENTS.LOGOUT, handleAuthChange);
+    };
+  }, [loadAuthToken, loadUserId, groupeCree, fetchGroupeComplet, fetchAllGroupes]);
+
+  // Rafraîchir le groupe et l'état d'authentification quand on revient sur la page
+  useFocusEffect(
+    useCallback(() => {
+      loadGroupeCree();
+      loadAuthToken();
+      loadUserId();
+      fetchAllGroupes();
+    }, [loadGroupeCree, loadAuthToken, loadUserId, fetchAllGroupes])
+  );
 
 
   const handleUpdateGroupe = useCallback(async () => {
@@ -228,7 +256,7 @@ export default function HomeScreen() {
     }
     fetchAllCompetences();
     fetchAllGroupes();
-  }, [groupeCree, fetchGroupeComplet]);
+  }, [groupeCree, fetchGroupeComplet, fetchAllCompetences, fetchAllGroupes]);
 
   const handleLogout = async () => {
     try {
@@ -237,6 +265,7 @@ export default function HomeScreen() {
       await AsyncStorage.removeItem('userPseudo');
       setAuthToken(null);
       setCurrentUserPseudo(null);
+      setCurrentUserId(null);
       Alert.alert('Déconnexion', 'Vous avez été déconnecté avec succès');
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', error);
@@ -267,7 +296,7 @@ export default function HomeScreen() {
       // Rafraîchir la liste de tous les groupes pour améliorer l'autocomplétion
       fetchAllGroupes();
     }
-  }, [saveGroupeCree, fetchGroupeComplet]);
+  }, [saveGroupeCree, fetchGroupeComplet, fetchAllGroupes]);
 
   // Combiner tous les groupes avec le groupe créé pour améliorer l'autocomplétion
   const combinedGroupes = useMemo(() => {
@@ -295,22 +324,9 @@ export default function HomeScreen() {
             <ThemedText type="title">Welcome!</ThemedText>
             <HelloWave />
           </ThemedView>
-          {authToken && currentUserPseudo && (
-            <ThemedView style={styles.authSection}>
-              <ThemedText style={styles.userInfo}>
-                Connecté: {currentUserPseudo}
-              </ThemedText>
-              <Button
-                title="Déconnexion"
-                onPress={handleLogout}
-                color="#ff3b30"
-              />
-            </ThemedView>
-          )}
         </ThemedView>
       </ThemedView>
 
-      <CreateAddressForm onAddressCreated={handleAddressCreated} />
       
       {groupeCree && (
         <ThemedView style={styles.groupeContainer}>
@@ -325,9 +341,18 @@ export default function HomeScreen() {
             onUpdate={handleUpdateGroupe}
             onAllCompetencesUpdate={fetchAllCompetences}
             onAddedCompetenceIdsUpdate={setAddedCompetenceIds}
+            onLoginSuccess={() => {
+              loadAuthToken();
+              loadUserId();
+            }}
           />
         </ThemedView>
       )}
+
+        <ThemedView style={styles.groupeContainer}>
+          <CreateAddressForm onAddressCreated={handleAddressCreated} />
+        </ThemedView>
+
     </ParallaxScrollView>
   );
 }

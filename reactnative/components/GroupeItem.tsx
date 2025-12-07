@@ -16,6 +16,7 @@ interface GroupeItemProps {
   onUpdate: () => void;
   onAllCompetencesUpdate: () => void;
   onAddedCompetenceIdsUpdate: (ids: Set<number>) => void;
+  onLoginSuccess?: () => void;
 }
 
 export function GroupeItem({
@@ -28,6 +29,7 @@ export function GroupeItem({
   onUpdate,
   onAllCompetencesUpdate,
   onAddedCompetenceIdsUpdate,
+  onLoginSuccess,
 }: GroupeItemProps) {
   const users = groupe.usersData || groupe.users || [];
 
@@ -38,23 +40,26 @@ export function GroupeItem({
         <ThemedText style={styles.groupeId}>ID: {groupe.id}</ThemedText>
       </ThemedView>
       
-      <UserSection
-        groupeId={groupe.id}
-        users={users}
-        authToken={authToken}
-        currentUserId={currentUserId}
-        onUpdate={onUpdate}
-      />
-      
       <DemandeSection
         groupeId={groupe.id}
         demandes={groupe.demandes || []}
         allCompetences={allCompetences}
         groupes={groupes}
         addedCompetenceIds={addedCompetenceIds}
+        currentUserId={currentUserId}
+        groupeUsers={users}
         onUpdate={onUpdate}
         onAllCompetencesUpdate={onAllCompetencesUpdate}
         onAddedCompetenceIdsUpdate={onAddedCompetenceIdsUpdate}
+      />
+      
+      <UserSection
+        groupeId={groupe.id}
+        users={users}
+        authToken={authToken}
+        currentUserId={currentUserId}
+        onUpdate={onUpdate}
+        onLoginSuccess={onLoginSuccess}
       />
     </ThemedView>
   );

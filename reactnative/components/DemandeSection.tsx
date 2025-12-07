@@ -13,6 +13,8 @@ interface DemandeSectionProps {
   allCompetences: CompetenceApi[];
   groupes: Groupe[];
   addedCompetenceIds: Set<number>;
+  currentUserId: number | null;
+  groupeUsers: any[];
   onUpdate: () => void;
   onAllCompetencesUpdate: () => void;
   onAddedCompetenceIdsUpdate: (ids: Set<number>) => void;
@@ -24,6 +26,8 @@ export function DemandeSection({
   allCompetences,
   groupes,
   addedCompetenceIds,
+  currentUserId,
+  groupeUsers,
   onUpdate,
   onAllCompetencesUpdate,
   onAddedCompetenceIdsUpdate,
@@ -35,8 +39,19 @@ export function DemandeSection({
   const borderColor = useThemeColor({}, 'icon');
   
   const hasDemande = demandes && demandes.length > 0;
+  
+  // Vérifier si l'utilisateur actuel est membre du groupe
+  const isUserInGroupe = currentUserId && groupeUsers.some(user => user.id === currentUserId);
+  // Permettre la modification si le groupe n'a pas d'utilisateurs (groupe vide)
+  const canModifyGroupe = groupeUsers.length === 0 || isUserInGroupe;
 
   const handleCreateDemande = async () => {
+    // Vérifier si l'utilisateur est membre du groupe ou si le groupe est vide
+    if (!canModifyGroupe) {
+      Alert.alert('Erreur', 'Vous devez être membre du groupe pour créer des demandes');
+      return;
+    }
+
     if (!demandeTexte.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer un texte pour la demande');
       return;
@@ -89,6 +104,8 @@ export function DemandeSection({
               groupes={groupes}
               addedCompetenceIds={addedCompetenceIds}
               demandeGroupeId={groupeId}
+              currentUserId={currentUserId}
+              groupeUsers={groupeUsers}
               onUpdate={onUpdate}
               onAllCompetencesUpdate={onAllCompetencesUpdate}
               onAddedCompetenceIdsUpdate={onAddedCompetenceIdsUpdate}
@@ -101,21 +118,34 @@ export function DemandeSection({
 
   return (
     <ThemedView style={styles.createDemandeContainer}>
-      <ThemedText style={styles.createDemandeLabel}>Créer une demande:</ThemedText>
-      <TextInput
-        style={[styles.demandeInput, { borderColor, color: textColor }]}
-        placeholder="Entrez le texte de la demande..."
-        placeholderTextColor={textColor + '80'}
-        value={demandeTexte}
-        onChangeText={setDemandeTexte}
-        multiline
-        numberOfLines={3}
-      />
-      <Button
-        title={loadingDemande ? 'Création...' : 'Créer la demande'}
-        onPress={handleCreateDemande}
-        disabled={loadingDemande || !demandeTexte.trim()}
-      />
+      {canModifyGroupe ? (
+        <>
+          <ThemedText style={styles.createDemandeLabel}>Créer une demande:</ThemedText>
+          {groupeUsers.length === 0 && (
+            <ThemedText style={styles.infoMessage}>
+              💡 Vous pouvez créer une demande maintenant. Vous pourrez vous connecter ou créer un utilisateur après.
+            </ThemedText>
+          )}
+          <TextInput
+            style={[styles.demandeInput, { borderColor, color: textColor }]}
+            placeholder="Entrez le texte de la demande..."
+            placeholderTextColor={textColor + '80'}
+            value={demandeTexte}
+            onChangeText={setDemandeTexte}
+            multiline
+            numberOfLines={3}
+          />
+          <Button
+            title={loadingDemande ? 'Création...' : 'Créer la demande'}
+            onPress={handleCreateDemande}
+            disabled={loadingDemande || !demandeTexte.trim()}
+          />
+        </>
+      ) : (
+        <ThemedText style={styles.restrictedMessage}>
+          Vous devez être membre du groupe pour créer des demandes
+        </ThemedText>
+      )}
     </ThemedView>
   );
 }
@@ -165,6 +195,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  restrictedMessage: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    opacity: 0.7,
+    textAlign: 'center',
+    padding: 8,
+  },
+  infoMessage: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    opacity: 0.8,
+    padding: 8,
+    backgroundColor: 'rgba(0,122,255,0.1)',
+    borderRadius: 6,
+    marginBottom: 8,
   },
 });
 
