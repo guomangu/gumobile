@@ -316,9 +316,35 @@ export function WorkerForm({ onUpdate }: WorkerFormProps) {
                 // Mettre à jour l'état global
                 authEvents.emit(AUTH_EVENTS.LOGIN);
             } else {
-                // Fallback: Tentative de login si le signup ne renvoie pas de token (dépend de l'implémentation API)
-                // Ici on suppose que le signup retourne token/user comme dans signup.tsx
-                throw new Error('Compte créé mais impossible de vous connecter automatiquement.');
+                // Fallback: Tentative de login si le signup ne renvoie pas de token
+                console.log('Tentative de connexion automatique...');
+                const loginResponse = await fetch(getApiUrl('login'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        pseudo: safePseudo.trim(),
+                        password: safePassword.trim(),
+                    }),
+                });
+
+                if (!loginResponse.ok) {
+                    throw new Error('Compte créé, mais échec de la connexion automatique. Veuillez vous connecter manuellement.');
+                }
+
+                const loginData = await loginResponse.json();
+                if (loginData.token && loginData.user?.id) {
+                    finalAuthToken = loginData.token;
+                    finalUserId = loginData.user.id;
+                    await AsyncStorage.setItem('authToken', finalAuthToken!);
+                    await AsyncStorage.setItem('userId', finalUserId!.toString());
+                    await AsyncStorage.setItem('userPseudo', loginData.user.pseudo);
+                    authEvents.emit(AUTH_EVENTS.LOGIN);
+                } else {
+                    throw new Error('Connexion réussie mais token manquant.');
+                }
             }
         }
 
