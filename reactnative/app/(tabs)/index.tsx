@@ -320,36 +320,7 @@ export default function HomeScreen() {
           style={styles.reactLogo}
         />
       }>
-      <ThemedView style={styles.titleContainer} cloudStyle={false}>
-        <ThemedView style={styles.headerRow} cloudStyle={false}>
-          <ThemedView style={styles.titleSection} cloudStyle={false}>
-            <ThemedText type="title">Welcome!</ThemedText>
-            <HelloWave />
-          </ThemedView>
-        </ThemedView>
-      </ThemedView>
 
-      
-      {groupeCree && (
-        <ThemedView style={styles.groupeContainer} cloudStyle={false}>
-          <ThemedText type="subtitle">Groupe créé</ThemedText>
-          <GroupeItem
-            groupe={groupeCree}
-            authToken={authToken}
-            currentUserId={currentUserId}
-            allCompetences={allCompetences}
-            groupes={combinedGroupes}
-            addedCompetenceIds={addedCompetenceIds}
-            onUpdate={handleUpdateGroupe}
-            onAllCompetencesUpdate={fetchAllCompetences}
-            onAddedCompetenceIdsUpdate={setAddedCompetenceIds}
-            onLoginSuccess={() => {
-              loadAuthToken();
-              loadUserId();
-            }}
-          />
-        </ThemedView>
-      )}
 
         <ThemedView style={styles.groupeContainer} cloudStyle={false}>
           <CreateAddressForm onAddressCreated={handleAddressCreated} />
