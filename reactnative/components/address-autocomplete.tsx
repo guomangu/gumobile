@@ -9,18 +9,29 @@ interface AddressAutocompleteProps {
   onSelectAddress: (address: BanAddressResult) => void;
   placeholder?: string;
   style?: any;
+  initialValue?: BanAddressResult | null;
 }
 
 export function AddressAutocomplete({ 
   onSelectAddress, 
   placeholder = "Rechercher une adresse...",
-  style 
+  style,
+  initialValue = null
 }: AddressAutocompleteProps) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialValue?.label || '');
   const [suggestions, setSuggestions] = useState<BanAddressResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Mettre à jour la query quand initialValue change
+  useEffect(() => {
+    if (initialValue && !query) {
+      setQuery(initialValue.label);
+      onSelectAddress(initialValue);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValue]);
 
   const backgroundColor = '#ffffff';
   const textColor = useThemeColor({}, 'text');

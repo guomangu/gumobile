@@ -1,9 +1,9 @@
-import { StyleSheet, Button, Alert } from 'react-native';
-import { useState } from 'react';
+import { StyleSheet, Button, Alert, Platform } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { importAddress, type BanAddressResult, type Adresse } from '@/constants/api';
+import { importAddress, reverseGeocode, type BanAddressResult, type Adresse } from '@/constants/api';
 import { AddressAutocomplete } from '@/components/address-autocomplete';
 import { type Groupe } from '@/components/types';
 import { AddressTag } from './AddressTag';
@@ -18,6 +18,90 @@ export function CreateAddressForm({ onAddressCreated }: CreateAddressFormProps) 
   const [complementAdresse, setComplementAdresse] = useState('');
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [createdAddresses, setCreatedAddresses] = useState<Adresse[]>([]);
+  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [initialAddress, setInitialAddress] = useState<BanAddressResult | null>(null);
+  const hasRequestedLocation = useRef(false);
+
+  // Demander la géolocalisation au chargement du composant
+  useEffect(() => {
+    const requestLocation = async () => {
+      if (hasRequestedLocation.current) return;
+      hasRequestedLocation.current = true;
+
+      try {
+        setLoadingLocation(true);
+        
+        let latitude: number;
+        let longitude: number;
+
+        if (Platform.OS === 'web') {
+          // Pour le web, utiliser l'API de géolocalisation du navigateur
+          if (!navigator.geolocation) {
+            console.log('Géolocalisation non supportée par le navigateur');
+            setLoadingLocation(false);
+            return;
+          }
+
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: false,
+              timeout: 10000,
+              maximumAge: 60000,
+            });
+          });
+
+          latitude = position.coords.latitude;
+          longitude = position.coords.longitude;
+        } else {
+          // Pour mobile, utiliser expo-location (import dynamique)
+          try {
+            const Location = await import('expo-location');
+            
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            
+            if (status !== 'granted') {
+              console.log('Permission de géolocalisation refusée');
+              setLoadingLocation(false);
+              return;
+            }
+
+            const location = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+
+            latitude = location.coords.latitude;
+            longitude = location.coords.longitude;
+          } catch (error) {
+            console.error('Erreur lors du chargement de expo-location:', error);
+            // Fallback sur l'API du navigateur si expo-location n'est pas disponible
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: false,
+                timeout: 10000,
+                maximumAge: 60000,
+              });
+            });
+            latitude = position.coords.latitude;
+            longitude = position.coords.longitude;
+          }
+        }
+
+        // Utiliser l'API BAN reverse pour obtenir l'adresse
+        const address = await reverseGeocode(latitude, longitude);
+
+        if (address) {
+          setInitialAddress(address);
+          setSelectedAddress(address);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la géolocalisation:', error);
+      } finally {
+        setLoadingLocation(false);
+      }
+    };
+
+    requestLocation();
+  }, []);
 
   const handleSelectAddress = (address: BanAddressResult) => {
     setSelectedAddress(address);
@@ -69,9 +153,15 @@ export function CreateAddressForm({ onAddressCreated }: CreateAddressFormProps) 
   return (
     <ThemedView style={styles.formContainer}>
       <ThemedText type="subtitle">Créer une nouvelle adresse</ThemedText>
+      {loadingLocation && (
+        <ThemedText style={styles.loadingText}>
+          📍 Détection de votre localisation...
+        </ThemedText>
+      )}
       <AddressAutocomplete
         onSelectAddress={handleSelectAddress}
         placeholder="Rechercher une adresse..."
+        initialValue={initialAddress}
       />
       {selectedAddress && (
         <ThemedView style={styles.selectedAddressContainer}>
@@ -148,6 +238,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    opacity: 0.7,
+    fontStyle: 'italic',
+    marginBottom: 8,
   },
 });
 

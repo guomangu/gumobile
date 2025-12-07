@@ -47,6 +47,7 @@ export const API_ENDPOINTS = {
 
 // Configuration de l'API BAN (Base Adresse Nationale)
 const BAN_API_URL = 'https://api-adresse.data.gouv.fr/search/';
+const BAN_REVERSE_API_URL = 'https://api-adresse.data.gouv.fr/reverse/';
 
 export interface BanAddressResult {
   id: string;
@@ -123,6 +124,46 @@ export async function searchAddresses(query: string, limit: number = 5): Promise
   } catch (error) {
     console.error('Erreur lors de la recherche d\'adresses:', error);
     throw error;
+  }
+}
+
+/**
+ * Recherche d'adresse par géolocalisation inverse (reverse geocoding)
+ */
+export async function reverseGeocode(latitude: number, longitude: number): Promise<BanAddressResult | null> {
+  try {
+    const response = await fetch(`${BAN_REVERSE_API_URL}?lat=${latitude}&lon=${longitude}`);
+    
+    if (!response.ok) {
+      throw new Error(`Erreur API BAN Reverse: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.features || !Array.isArray(data.features) || data.features.length === 0) {
+      return null;
+    }
+    
+    const feature = data.features[0];
+    const props = feature.properties || {};
+    const coords = feature.geometry?.coordinates || [];
+    
+    return {
+      id: feature.id || '',
+      label: props.label || '',
+      housenumber: props.housenumber || undefined,
+      street: props.street || '',
+      postcode: props.postcode || '',
+      city: props.city || '',
+      context: props.context || '',
+      type: props.type || '',
+      importance: props.importance || 0,
+      longitude: coords[0] || 0,
+      latitude: coords[1] || 0,
+    };
+  } catch (error) {
+    console.error('Erreur lors de la géolocalisation inverse:', error);
+    return null;
   }
 }
 
