@@ -33,7 +33,7 @@ class Groupe
     #[Groups(['adresse:read', 'groupe:read'])]
     private ?string $nom = null;
 
-    #[ORM\OneToMany(targetEntity: Adresse::class, mappedBy: 'groupe', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\ManyToMany(targetEntity: Adresse::class, mappedBy: 'groupes')]
     #[Groups(['groupe:read'])]
     private Collection $adresses;
 
@@ -80,7 +80,7 @@ class Groupe
     {
         if (!$this->adresses->contains($adresse)) {
             $this->adresses->add($adresse);
-            $adresse->setGroupe($this);
+            $adresse->addGroupe($this);
         }
 
         return $this;
@@ -89,9 +89,7 @@ class Groupe
     public function removeAdresse(Adresse $adresse): static
     {
         if ($this->adresses->removeElement($adresse)) {
-            if ($adresse->getGroupe() === $this) {
-                $adresse->setGroupe(null);
-            }
+            $adresse->removeGroupe($this);
         }
 
         return $this;

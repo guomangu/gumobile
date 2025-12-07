@@ -20,7 +20,7 @@ export function AddressAutocomplete({
   const [suggestions, setSuggestions] = useState<BanAddressResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const backgroundColor = '#ffffff';
   const textColor = useThemeColor({}, 'text');

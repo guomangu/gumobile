@@ -74,6 +74,10 @@ export interface Adresse {
     valeur: string;
   };
   enfants?: Adresse[];
+  groupes?: {
+    id: number;
+    nom: string;
+  }[];
   groupe?: {
     id: number;
     nom: string;
@@ -190,6 +194,32 @@ export async function getAddresses(): Promise<Adresse[]> {
     // En cas d'erreur réseau ou autre, retourner un tableau vide plutôt que de lancer une erreur
     console.error('Erreur lors de la récupération des adresses:', error);
     return [];
+  }
+}
+
+/**
+ * Récupère une adresse par son ID avec ses groupes et enfants
+ */
+export async function getAddressById(id: number): Promise<Adresse | null> {
+  try {
+    const response = await fetch(getApiUrl(`${API_ENDPOINTS.ADRESSES}/${id}`), {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Erreur API: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Erreur lors de la récupération de l\'adresse:', error);
+    throw error;
   }
 }
 

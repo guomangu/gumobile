@@ -195,7 +195,7 @@ class AdresseController extends AbstractController
 
         if ($existingTag) {
             // Si le tag existe, on l'ajoute au groupe (s'il n'y est pas déjà)
-            if ($existingTag->getGroupe() !== $groupe) {
+            if (!$existingTag->getGroupes()->contains($groupe)) {
                 $groupe->addAdresse($existingTag);
             }
             return $existingTag;
@@ -208,7 +208,7 @@ class AdresseController extends AbstractController
         $tag->setParent($parent);
         $tag->setLatitude($latitude);
         $tag->setLongitude($longitude);
-        $tag->setGroupe($groupe);
+        $tag->addGroupe($groupe);
 
         $this->entityManager->persist($tag);
         // Flush immédiatement pour que le tag ait un ID pour les recherches suivantes

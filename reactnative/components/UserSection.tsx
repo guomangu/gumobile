@@ -123,7 +123,7 @@ export function UserSection({ groupeId, users, authToken, currentUserId, onUpdat
       const updateResponse = await fetch(getApiUrl(`${API_ENDPOINTS.USERS}/${currentUserId}`), {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/merge-patch+json',
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': `Bearer ${authToken}`,
         },

@@ -75,6 +75,7 @@ export default function HomeScreen() {
                   demandes: groupe.demandes || [],
                   users: groupe.usersData || groupe.users || [],
                   usersData: groupe.usersData || groupe.users || [],
+                  adresses: groupe.adresses || [],
                 };
               } else {
                 console.warn('[fetchGroupeComplet] Groupe non trouvé dans la liste, ID recherché:', groupeId);
@@ -96,6 +97,7 @@ export default function HomeScreen() {
         demandes: data.demandes || [],
         users: data.usersData || data.users || [],
         usersData: data.usersData || data.users || [],
+        adresses: data.adresses || [],
       };
     } catch (error: any) {
       console.error('[fetchGroupeComplet] Erreur complète:', error);

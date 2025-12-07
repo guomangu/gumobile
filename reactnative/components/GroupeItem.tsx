@@ -4,7 +4,8 @@ import { ThemedView } from '@/components/themed-view';
 import { type Groupe } from './types';
 import { UserSection } from './UserSection';
 import { DemandeSection } from './DemandeSection';
-import { type Competence as CompetenceApi } from '@/constants/api';
+import { type Competence as CompetenceApi, type Adresse } from '@/constants/api';
+import { AddressTag } from './AddressTag';
 
 interface GroupeItemProps {
   groupe: Groupe;
@@ -33,12 +34,31 @@ export function GroupeItem({
 }: GroupeItemProps) {
   const users = groupe.usersData || groupe.users || [];
 
+  // Convertir les adresses du groupe en format Adresse pour AddressTag
+  const groupeAdresses: Adresse[] = (groupe.adresses || []).map(addr => ({
+    id: addr.id,
+    type: addr.type as Adresse['type'],
+    valeur: addr.valeur,
+  }));
+
   return (
     <ThemedView style={styles.groupeItem}>
       <ThemedView style={styles.groupeHeader}>
         <ThemedText type="defaultSemiBold">{groupe.nom}</ThemedText>
         <ThemedText style={styles.groupeId}>ID: {groupe.id}</ThemedText>
       </ThemedView>
+      
+      {/* Affichage des adresses comme tags cliquables */}
+      {groupeAdresses.length > 0 && (
+        <ThemedView style={styles.addressesSection}>
+          <ThemedText style={styles.addressesLabel}>Adresses:</ThemedText>
+          <ThemedView style={styles.addressesTags}>
+            {groupeAdresses.map((adresse) => (
+              <AddressTag key={adresse.id} adresse={adresse} />
+            ))}
+          </ThemedView>
+        </ThemedView>
+      )}
       
       <DemandeSection
         groupeId={groupe.id}
@@ -81,6 +101,23 @@ const styles = StyleSheet.create({
   groupeId: {
     fontSize: 12,
     opacity: 0.6,
+  },
+  addressesSection: {
+    marginTop: 8,
+    marginBottom: 8,
+    gap: 8,
+  },
+  addressesLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.8,
+    marginBottom: 8,
+    paddingBottom: 4,
+  },
+  addressesTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
 });
 

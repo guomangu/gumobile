@@ -33,5 +33,10 @@ export interface Groupe {
   demandes?: Demande[];
   users?: User[];
   usersData?: User[];
+  adresses?: {
+    id: number;
+    type: string;
+    valeur: string;
+  }[];
 }
 

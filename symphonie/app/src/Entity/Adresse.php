@@ -14,6 +14,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: AdresseRepository::class)]
+#[ORM\UniqueConstraint(name: 'unique_tag', columns: ['type', 'valeur', 'parent_id'])]
 #[ApiResource(
     operations: [
         new GetCollection(normalizationContext: ['groups' => ['adresse:read']]),
@@ -55,14 +56,15 @@ class Adresse
     #[Groups(['adresse:read'])]
     private Collection $enfants;
 
-    #[ORM\ManyToOne(targetEntity: Groupe::class, inversedBy: 'adresses')]
-    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToMany(targetEntity: Groupe::class, inversedBy: 'adresses')]
+    #[ORM\JoinTable(name: 'adresse_groupe')]
     #[Groups(['adresse:read'])]
-    private ?Groupe $groupe = null;
+    private Collection $groupes;
 
     public function __construct()
     {
         $this->enfants = new ArrayCollection();
+        $this->groupes = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -159,14 +161,26 @@ class Adresse
         return $this;
     }
 
-    public function getGroupe(): ?Groupe
+    /**
+     * @return Collection<int, Groupe>
+     */
+    public function getGroupes(): Collection
     {
-        return $this->groupe;
+        return $this->groupes;
     }
 
-    public function setGroupe(?Groupe $groupe): static
+    public function addGroupe(Groupe $groupe): static
     {
-        $this->groupe = $groupe;
+        if (!$this->groupes->contains($groupe)) {
+            $this->groupes->add($groupe);
+        }
+
+        return $this;
+    }
+
+    public function removeGroupe(Groupe $groupe): static
+    {
+        $this->groupes->removeElement($groupe);
 
         return $this;
     }

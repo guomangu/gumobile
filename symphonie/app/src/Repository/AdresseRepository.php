@@ -57,7 +57,8 @@ class AdresseRepository extends ServiceEntityRepository
     public function findByGroupe($groupe): array
     {
         return $this->createQueryBuilder('a')
-            ->where('a.groupe = :groupe')
+            ->innerJoin('a.groupes', 'g')
+            ->where('g = :groupe')
             ->setParameter('groupe', $groupe)
             ->orderBy('a.type', 'ASC')
             ->getQuery()
