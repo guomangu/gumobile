@@ -1,4 +1,5 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { type Groupe } from './types';
@@ -32,6 +33,7 @@ export function GroupeItem({
   onAddedCompetenceIdsUpdate,
   onLoginSuccess,
 }: GroupeItemProps) {
+  const router = useRouter();
   const users = groupe.usersData || groupe.users || [];
 
   // Convertir les adresses du groupe en format Adresse pour AddressTag
@@ -41,12 +43,20 @@ export function GroupeItem({
     valeur: addr.valeur,
   }));
 
+  const handleGroupePress = () => {
+    router.push(`/groupe/${groupe.id}`);
+  };
+
   return (
     <ThemedView style={styles.groupeItem}>
-      <ThemedView style={styles.groupeHeader}>
+      <TouchableOpacity
+        style={styles.groupeHeader}
+        onPress={handleGroupePress}
+        activeOpacity={0.7}
+      >
         <ThemedText type="defaultSemiBold">{groupe.nom}</ThemedText>
         <ThemedText style={styles.groupeId}>ID: {groupe.id}</ThemedText>
-      </ThemedView>
+      </TouchableOpacity>
       
       {/* Affichage des adresses comme tags cliquables */}
       {groupeAdresses.length > 0 && (

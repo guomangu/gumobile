@@ -118,7 +118,7 @@ export default function AddressDetailScreen() {
               <TouchableOpacity
                 key={groupe.id}
                 style={styles.groupItem}
-                onPress={() => router.push(`/(tabs)/groupe`)}
+                onPress={() => router.push(`/groupe/${groupe.id}`)}
               >
                 <ThemedText type="defaultSemiBold">{groupe.nom}</ThemedText>
                 <ThemedText style={styles.groupId}>ID: {groupe.id}</ThemedText>

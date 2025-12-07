@@ -17,7 +17,10 @@ use Symfony\Component\Serializer\Annotation\Groups;
     operations: [
         new GetCollection(normalizationContext: ['groups' => ['demande:read']]),
         new Get(normalizationContext: ['groups' => ['demande:read']]),
-        new Post(),
+        new Post(
+            denormalizationContext: ['groups' => ['demande:write']],
+            normalizationContext: ['groups' => ['demande:read']]
+        ),
     ],
     formats: ['json' => ['application/json']]
 )]
@@ -26,20 +29,25 @@ class Demande
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['demande:read', 'groupe:read'])]
+    #[Groups(['demande:read', 'groupe:read', 'user:read'])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'text')]
-    #[Groups(['demande:read', 'groupe:read'])]
+    #[Groups(['demande:read', 'groupe:read', 'demande:write', 'user:read'])]
     private ?string $texte = null;
 
     #[ORM\ManyToOne(targetEntity: Groupe::class, inversedBy: 'demandes')]
-    #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['demande:read'])]
+    #[ORM\JoinColumn(nullable: true)]
+    #[Groups(['demande:read', 'demande:write', 'user:read'])]
     private ?Groupe $groupe = null;
 
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'demandes')]
+    #[ORM\JoinColumn(nullable: true)]
+    #[Groups(['demande:read', 'demande:write'])]
+    private ?User $user = null;
+
     #[ORM\ManyToMany(targetEntity: Competence::class, mappedBy: 'demandes')]
-    #[Groups(['demande:read', 'groupe:read'])]
+    #[Groups(['demande:read', 'groupe:read', 'demande:write', 'user:read'])]
     private Collection $competences;
 
     public function __construct()
@@ -99,6 +107,18 @@ class Demande
         if ($this->competences->removeElement($competence)) {
             $competence->removeDemande($this);
         }
+
+        return $this;
+    }
+
+    public function getUser(): ?User
+    {
+        return $this->user;
+    }
+
+    public function setUser(?User $user): static
+    {
+        $this->user = $user;
 
         return $this;
     }

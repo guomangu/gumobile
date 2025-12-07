@@ -44,7 +44,7 @@ export function AddressAutocomplete({
     }
 
     // Si la requête est vide, vider les suggestions
-    if (!query.trim()) {
+    if (!(query || '').trim()) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -154,7 +154,7 @@ export function AddressAutocomplete({
         </ThemedView>
       )}
 
-      {showSuggestions && suggestions.length === 0 && !loading && query.trim() && (
+      {showSuggestions && suggestions.length === 0 && !loading && (query || '').trim() !== '' && (
         <ThemedView
           style={[
             styles.suggestionsContainer,

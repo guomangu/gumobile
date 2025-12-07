@@ -56,9 +56,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:write'])]
     private Collection $groupes;
 
+    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'user', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[Groups(['user:read'])]
+    private Collection $demandes;
+
     public function __construct()
     {
         $this->groupes = new ArrayCollection();
+        $this->demandes = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -162,6 +167,35 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getRoles(): array
     {
         return ['ROLE_USER'];
+    }
+
+    /**
+     * @return Collection<int, Demande>
+     */
+    public function getDemandes(): Collection
+    {
+        return $this->demandes;
+    }
+
+    public function addDemande(Demande $demande): static
+    {
+        if (!$this->demandes->contains($demande)) {
+            $this->demandes->add($demande);
+            $demande->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeDemande(Demande $demande): static
+    {
+        if ($this->demandes->removeElement($demande)) {
+            if ($demande->getUser() === $this) {
+                $demande->setUser(null);
+            }
+        }
+
+        return $this;
     }
 
     /**

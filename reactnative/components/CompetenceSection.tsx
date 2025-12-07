@@ -154,6 +154,22 @@ export function CompetenceSection({
     );
   }, [demandeTexte, competences, allCompetences, combinedAddedIds]);
 
+  // Nouvelle logique : Filtrer les compétences globales en fonction de la saisie utilisateur
+  const filteredGlobalCompetences = useMemo(() => {
+    if (!competenceNom.trim()) return [];
+    
+    const searchLower = competenceNom.toLowerCase().trim();
+    const alreadyAddedIds = new Set([...addedCompetenceIds, ...locallyAddedCompetenceIds]);
+    
+    // Ajouter aussi les IDs des compétences déjà présentes dans la demande
+    competences.forEach(c => alreadyAddedIds.add(c.id));
+
+    return allCompetences.filter(c => 
+      c.nom.toLowerCase().includes(searchLower) && 
+      !alreadyAddedIds.has(c.id)
+    ).slice(0, 5); // Limiter à 5 suggestions
+  }, [competenceNom, allCompetences, addedCompetenceIds, locallyAddedCompetenceIds, competences]);
+
   return (
     <>
       {/* Affichage des compétences existantes */}
@@ -235,6 +251,25 @@ export function CompetenceSection({
             value={competenceNom}
             onChangeText={setCompetenceNom}
           />
+
+          {/* Suggestions basées sur la saisie directe (Base Globale) */}
+          {filteredGlobalCompetences.length > 0 && (
+            <ThemedView style={styles.proposedCompetencesContainer}>
+              <ThemedText style={styles.proposedCompetencesLabel}>Compétences existantes :</ThemedText>
+              <ThemedView style={styles.proposedCompetencesTags}>
+                {filteredGlobalCompetences.map((competence) => (
+                  <TouchableOpacity
+                    key={competence.id}
+                    style={[styles.proposedCompetenceTag, { backgroundColor: 'rgba(52, 199, 89, 0.1)', borderColor: 'transparent' }]}
+                    onPress={() => handleCreateCompetence(competence.nom, competence.id)}
+                  >
+                    <ThemedText style={styles.proposedCompetenceTagText}>{competence.nom}</ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </ThemedView>
+            </ThemedView>
+          )}
+
           <Button
             title={loadingCompetence ? 'Création...' : 'Ajouter'}
             onPress={() => handleCreateCompetence()}

@@ -93,6 +93,11 @@ export function MenuBurger({ authToken, userPseudo, onLogout, onLoginSuccess }: 
     router.push('/(tabs)/signup');
   };
 
+  const handleAccount = () => {
+    setIsMenuOpen(false);
+    router.push('/(tabs)/user');
+  };
+
   const handleLogout = () => {
     setIsMenuOpen(false);
     // Émettre un événement de déconnexion pour notifier toutes les pages
@@ -144,6 +149,15 @@ export function MenuBurger({ authToken, userPseudo, onLogout, onLoginSuccess }: 
                     👤 {userPseudo}
                   </ThemedText>
                 </ThemedView>
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderColor }]}
+                  onPress={handleAccount}
+                >
+                  <MaterialIcons name="account-circle" size={20} color="#000000" />
+                  <ThemedText style={styles.menuItemText}>
+                    Mon compte
+                  </ThemedText>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.menuItem, { borderColor }]}
                   onPress={handleLogout}

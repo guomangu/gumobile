@@ -26,6 +26,24 @@ export default function RootLayout() {
             headerTintColor: '#000000',
           }} 
         />
+        <Stack.Screen 
+          name="groupe/[id]" 
+          options={{ 
+            presentation: 'card',
+            title: 'Détails du groupe',
+            headerStyle: { backgroundColor: '#B0E0E6' },
+            headerTintColor: '#000000',
+          }} 
+        />
+        <Stack.Screen 
+          name="worker/create" 
+          options={{ 
+            presentation: 'card',
+            title: 'Créer un Worker',
+            headerStyle: { backgroundColor: '#B0E0E6' },
+            headerTintColor: '#000000',
+          }} 
+        />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

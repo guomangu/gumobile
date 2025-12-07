@@ -18,7 +18,11 @@ use Symfony\Component\Serializer\Annotation\Groups;
     operations: [
         new GetCollection(normalizationContext: ['groups' => ['competence:read']]),
         new Get(normalizationContext: ['groups' => ['competence:read']]),
-        new Post(processor: CompetenceUniqueValidator::class),
+        new Post(
+            processor: CompetenceUniqueValidator::class,
+            denormalizationContext: ['groups' => ['competence:write']],
+            normalizationContext: ['groups' => ['competence:read']]
+        ),
     ],
     formats: ['json' => ['application/json']]
 )]
@@ -27,15 +31,15 @@ class Competence
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['competence:read', 'demande:read', 'groupe:read'])]
+    #[Groups(['competence:read', 'demande:read', 'groupe:read', 'user:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255, unique: true)]
-    #[Groups(['competence:read', 'demande:read', 'groupe:read'])]
+    #[Groups(['competence:read', 'demande:read', 'groupe:read', 'competence:write', 'user:read'])]
     private ?string $nom = null;
 
     #[ORM\ManyToMany(targetEntity: Demande::class, inversedBy: 'competences')]
-    #[Groups(['competence:read'])]
+    #[Groups(['competence:read', 'competence:write'])]
     private Collection $demandes;
 
     public function __construct()

@@ -25,12 +25,15 @@ final class CompetenceUniqueValidator implements ProcessorInterface
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
+        error_log('CompetenceUniqueValidator: start processing');
         if (!$data instanceof Competence) {
             return $this->processor->process($data, $operation, $uriVariables, $context);
         }
 
         // Normaliser le nom (trim et lowercase pour la comparaison)
         $nom = trim($data->getNom() ?? '');
+        error_log('CompetenceUniqueValidator: nom = ' . $nom);
+        
         if (empty($nom)) {
             throw new BadRequestHttpException('Le nom de la compétence ne peut pas être vide.');
         }

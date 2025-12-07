@@ -91,10 +91,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="user"
+        options={{
+          title: 'Mon compte',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="login"
         options={{
           title: 'Connexion',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+          href: null, // Masquer de la barre de navigation
         }}
       />
       <Tabs.Screen
