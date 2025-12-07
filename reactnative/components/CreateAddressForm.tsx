@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   workButton: {
-    backgroundColor: 'rgba(0, 122, 255, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   buttonActive: {
     backgroundColor: 'rgba(0, 122, 255, 0.9)',
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   workButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#000000',
   },
   buttonTextActive: {
     color: '#FFFFFF',
